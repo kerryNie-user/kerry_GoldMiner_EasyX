@@ -46,13 +46,13 @@ std::string maskPath_gold_small = "res/img_gold_small_mask.jpg";
 // 定义游戏场景宏
 #define game_scene_menu 1
 #define game_scene_signin 2
-#define game_scene_confirm 3
 #define game_scene_login 4
 #define game_scene_game 5
 
 LinkedList<std::string> storedUsername;
 LinkedList<std::string> storedPassword;
 LinkedList<int> storedStage;
+int userIndex;
 
 IMAGE img_startup;
 IMAGE img_signin;
@@ -249,14 +249,17 @@ class CSignin : public CScene {
 protected:
     CInputBox m_input_username;
     CInputBox m_input_password;
+    CInputBox m_input_confirm;
 private:
     CButton m_button_ok;
     CButton m_button_cancel;
+    bool confirm;
 public:
     // 构造函数传入设置场景的回调函数，并初始化输入框和按钮及回调
-    CSignin(std::function<void(int)> setGameScene) : CScene(setGameScene),
+    CSignin(std::function<void(int)> setGameScene) : CScene(setGameScene), confirm(false), 
         m_input_username(0.34 * WID, 0.44 * HEI, 0.48 * WID, 0.12 * HEI), 
         m_input_password(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI), 
+        m_input_confirm(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI), 
         m_button_ok(0.8 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "OK", std::bind(&CSignin::callbackOk, this)), 
         m_button_cancel(0.04 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "CANCEL", std::bind(&CSignin::callbackCancel, this)) {}
 
@@ -265,8 +268,12 @@ public:
         if (MouseHit()) {
             m = GetMouseMsg();
             if (m.uMsg == WM_LBUTTONDOWN) {
-                m_input_username.simulateMouseClick(m.x, m.y);
-                m_input_password.simulateMouseClick(m.x, m.y);
+                if (confirm) {
+                    m_input_confirm.simulateMouseClick(m.x, m.y);
+                } else {
+                    m_input_username.simulateMouseClick(m.x, m.y);
+                    m_input_password.simulateMouseClick(m.x, m.y);
+                }
                 m_button_ok.simulateMouseClick(m.x, m.y);
                 m_button_cancel.simulateMouseClick(m.x, m.y);
             }
@@ -282,7 +289,11 @@ public:
         settextstyle(40, 0, _T("宋体"));
         settextcolor(BLACK);
         m_input_username.draw();
-        m_input_password.draw();
+        if (confirm) {
+            m_input_confirm.draw();
+        } else {
+            m_input_password.draw();
+        }
         m_button_ok.draw();
         m_button_cancel.draw();
         FlushBatchDraw();
@@ -290,75 +301,46 @@ public:
 
 private:
     void callbackOk () {
-        std::string username = m_input_username.getInputText();
-        std::string password = m_input_password.getInputText();
-        auto itUser = storedUsername.begin();
-        for (; itUser != storedUsername.end(); ++itUser) {
-            if (username == *itUser) {
-                outputStatus("Username has been used");
+        if (confirm) {
+            std::string passwordOld = m_input_password.getInputText();
+            std::string passwordNew = m_input_confirm.getInputText();
+            if (passwordOld == passwordNew) {
+                storedUsername.push_back(m_input_username.getInputText());
+                storedPassword.push_back(m_input_password.getInputText());
+                storedStage.push_back(1);
+                outputStatus("Welcome in...");
+                setGameScene(game_scene_game);
+            } else {
+                outputStatus("Password incorrect");
+            }
+        } else {
+            std::string username = m_input_username.getInputText();
+            std::string password = m_input_password.getInputText();
+            if (username.empty()) {
+                outputStatus("Username cannot be empty");
+                return;
+            } else if (password.empty()) {
+                outputStatus("Password cannot be empty");
                 return;
             }
-        }
-        setGameScene(game_scene_confirm);
-    }
-
-    void callbackCancel () {
-        setGameScene(game_scene_menu);
-    }
-};
-
-class CConfirm : public CSignin{
-private:
-    CButton m_button_ok;
-    CButton m_button_cancel;
-    CInputBox m_input_confirm;
-public:
-    // 构造函数传入设置场景的回调函数，并初始化输入框和按钮及回调
-    CConfirm(std::function<void(int)> setGameScene) : CSignin(setGameScene),
-        m_button_ok(0.8 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, _T("OK"), std::bind(&CConfirm::callbackOk, this)),
-        m_button_cancel(0.04 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, _T("CANCEL"), std::bind(&CConfirm::callbackCancel, this)),
-        m_input_confirm(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI) {}
-    void update() override {
-        MOUSEMSG m;
-        if (MouseHit()) {
-            m = GetMouseMsg();
-            if (m.uMsg == WM_LBUTTONDOWN) {
-                m_input_confirm.simulateMouseClick(m.x, m.y);
-                m_button_ok.simulateMouseClick(m.x, m.y);
-                m_button_cancel.simulateMouseClick(m.x, m.y);
+            auto itUser = storedUsername.begin();
+            for (userIndex = 0; itUser != storedUsername.end(); ++itUser, ++userIndex) {
+                if (username == *itUser) {
+                    outputStatus("Username has been used");
+                    return;
+                }
             }
-        }
-    }
-    void render() override {
-        cleardevice();
-        putimage(0, 0, &img_signin);
-        setbkmode(TRANSPARENT);
-        setfillcolor(RGB(224, 243, 225));
-        fillrectangle(0.12 * WID, 0.37 * HEI, 0.88 * WID, 0.8 * HEI);
-        settextstyle(40, 0, _T("宋体"));
-        settextcolor(BLACK);
-        m_input_username.draw();
-        m_input_confirm.draw();
-        m_button_ok.draw();
-        m_button_cancel.draw();
-        FlushBatchDraw();
-    }
-private:
-    void callbackOk () {
-        std::string passwordOld = m_input_password.getInputText();
-        std::string passwordNew = m_input_confirm.getInputText();
-        if (passwordOld == passwordNew) {
-            storedUsername.push_back(m_input_username.getInputText());
-            storedPassword.push_back(m_input_password.getInputText());
-            outputStatus("Welcome in...");
-            setGameScene(game_scene_game);
-        } else {
-            outputStatus("Password incorrect");
+            outputStatus("Please confirm your password");
+            confirm = true;
         }
     }
 
     void callbackCancel () {
-        setGameScene(game_scene_signin);
+        if (confirm) {
+            confirm = false;
+        } else {
+            setGameScene(game_scene_menu);
+        }
     }
 };
 
@@ -407,7 +389,7 @@ private:
         std::string password = m_input_password.getInputText();
         auto itUser = storedUsername.begin();
         auto itPass = storedPassword.begin();
-        for (; itUser != storedUsername.end() && itPass != storedPassword.end(); ++itUser, ++itPass) {
+        for (userIndex = 0; itUser != storedUsername.end() && itPass != storedPassword.end(); ++itUser, ++itPass, ++userIndex) {
             if (username == *itUser && password == *itPass) {
                 outputStatus("Welcome back...");
                 setGameScene(game_scene_game);
@@ -415,7 +397,6 @@ private:
             }
         }
         outputStatus("Username or Password incorrect");
-        setGameScene(game_scene_signin);
     }
 
     void callbackCancel () {
@@ -429,13 +410,11 @@ private:
     CMenu m_menu;
     CSignin m_signin;
     CLogin m_login;
-    CConfirm m_confirm;
 public:
     Game() : m_game_scene(game_scene_menu),
              m_menu([this](int scene) { this->m_game_scene = scene; }),
              m_signin([this](int scene) { this->m_game_scene = scene; }),
-             m_login([this](int scene) { this->m_game_scene = scene; }),
-             m_confirm([this](int scene) { this->m_game_scene = scene; }) {}
+             m_login([this](int scene) { this->m_game_scene = scene; }) {}
     void run() {
         initgraph(WID, HEI);
         loadIMAGE();
@@ -451,15 +430,14 @@ public:
                     m_signin.update();
                     m_signin.render();
                     break;
-                case game_scene_confirm:
-                    m_confirm.update();
-                    m_confirm.render();
-                    break;
                 case game_scene_login:
                     m_login.update();
                     m_login.render();
                     break;
                 case game_scene_game:
+                    EndBatchDraw();
+                    writeTEXT();
+                    closegraph();
                     return;
                     break;
                 default:
@@ -481,13 +459,17 @@ private:
         }
         std::string username, password;
         int stage;
+        if (file.peek() == std::ifstream::traits_type::eof()) {
+            file.close();
+            return true;
+        }
         while (file >> username >> password >> stage) {
             storedUsername.push_back(username);
             storedPassword.push_back(password);
             storedStage.push_back(stage);
         }
         file.close();
-        return storedUsername.size() == storedPassword.size() == storedStage.size();
+        return storedUsername.size() == storedPassword.size() && storedUsername.size() == storedStage.size();
     }
     void loadIMAGE () {
         loadimage(&img_startup, imgPath_startup.c_str(), WID, HEI, true);
