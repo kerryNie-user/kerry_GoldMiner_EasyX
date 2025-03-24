@@ -2,8 +2,8 @@
 
 LinkedList<std::unique_ptr<GameObject>> m_gameObjects;
 
-auto obj_gold_big = GameObjectFactory::createGameObject(GameObjectType::GOLD, 200, 200, 3, img_gold_big, mask_gold_big);
-auto obj_gold_small = GameObjectFactory::createGameObject(GameObjectType::GOLD, 500, 150, 1, img_gold_small, mask_gold_small);
+std::unique_ptr<GameObject> obj_gold_big = GameObjectFactory::createGameObject(GameObjectType::GOLD, 200, 200, BIG, img_gold_big, mask_gold_big);
+std::unique_ptr<GameObject> obj_gold_small = GameObjectFactory::createGameObject(GameObjectType::GOLD, 500, 150, BIG, img_gold_small, mask_gold_small);
 
 #define degreesToRadians(angleDegrees) ((angleDegrees) * M_PI / 180.0)
 
@@ -262,11 +262,10 @@ void CHook::retract() {
     isRetracting = true;
 }
 
-GameObject::GameObject(double x, double y, int size, IMAGE img, IMAGE mask)
+GameObject::GameObject(double x, double y, int size, IMAGE& img, IMAGE& mask)
     : x(x), y(y), size(size), img(img), mask(mask) {}
 void GameObject::draw() {
-    putimage(x, y, &mask, NOTSRCERASE);
-    putimage(x, y, &img, SRCINVERT);
+    putimgwithmask(img, mask, x, y);
 }
 void GameObject::retract() {
     isRetracting = true;
@@ -292,7 +291,7 @@ int GameObject::getSpeed() const {
     return speed;
 }
 
-Gold::Gold(int x, int y, int size, IMAGE img, IMAGE mask) 
+Gold::Gold(int x, int y, int size, IMAGE& img, IMAGE& mask) 
     : GameObject(x, y, size, img, mask) {
     setRadiusAndSpeed();
 }
@@ -305,7 +304,7 @@ void Gold::setRadiusAndSpeed() {
     this->score = scores[size];
 }
 
-Rock::Rock(int x, int y, int size, IMAGE img, IMAGE mask) 
+Rock::Rock(int x, int y, int size, IMAGE& img, IMAGE& mask) 
     : GameObject(x, y, size, img, mask) {
     setRadiusAndSpeed();
 }
@@ -318,7 +317,7 @@ void Rock::setRadiusAndSpeed() {
     this->score = scores[size];
 }
 
-Diamond::Diamond(int x, int y, IMAGE img, IMAGE mask)
+Diamond::Diamond(int x, int y, IMAGE& img, IMAGE& mask)
     : GameObject(x, y, 1, img, mask) {
     setRadiusAndSpeed();
 }
@@ -328,9 +327,10 @@ void Diamond::setRadiusAndSpeed() {
     this->score = 1000;
 }
 
-std::unique_ptr<GameObject> GameObjectFactory::createGameObject(GameObjectType type, int x, int y, int size, IMAGE img, IMAGE mask) {
+std::unique_ptr<GameObject> GameObjectFactory::createGameObject(GameObjectType type, int x, int y, int size, IMAGE& img, IMAGE& mask) {
     switch (type) {
         case GameObjectType::GOLD:
+            return nullptr;
             return std::make_unique<Gold>(x, y, size, img, mask);
         case GameObjectType::ROCK:
             return std::make_unique<Rock>(x, y, size, img, mask);
@@ -446,9 +446,8 @@ void CSignin::callbackOk() {
             outputStatus("Password cannot be empty");
             return;
         }
-        auto itUser = storedUsername.begin();
-        for (userIndex = 0; itUser != storedUsername.end(); ++itUser, ++userIndex) {
-            if (username == *itUser) {
+        for (userIndex = 0; userIndex < storedUsername.size(); ++userIndex) {
+            if (username == storedUsername[userIndex]) {
                 outputStatus("Username has been used");
                 return;
             }
@@ -499,10 +498,8 @@ void CLogin::render() {
 void CLogin::callbackOk() {
     std::string username = m_input_username.getInputText();
     std::string password = m_input_password.getInputText();
-    auto itUser = storedUsername.begin();
-    auto itPass = storedPassword.begin();
-    for (userIndex = 0; itUser != storedUsername.end() && itPass != storedPassword.end(); ++itUser, ++itPass, ++userIndex) {
-        if (username == *itUser && password == *itPass) {
+    for (userIndex = 0; userIndex < storedUsername.size(); ++userIndex) {
+        if (username == storedUsername[userIndex] && password == storedPassword[userIndex]) {
             outputStatus("Welcome back...");
             setGameScene(game_scene_game);
             return;
@@ -531,7 +528,7 @@ void CGame::update() {
     if (m_clock.isContinue()) {
         m_clock.update();
         m_hook.update();
-        if (!m_gameObjects.empty()) {
+        /*if (!m_gameObjects.empty()) {
             for (auto& obj : m_gameObjects) {
                 if (obj->retracted()) {
                     obj->move(m_hook.getAngle());
@@ -567,7 +564,7 @@ void CGame::update() {
             }
         } else {
             setGameScene(game_scene_menu);
-        }
+        }*/
     } else {
         if (m_score.reachGoal()) {
             outputStatus("Stage Clear!");
@@ -587,11 +584,11 @@ void CGame::render() {
     m_stage.draw();
     m_miner.draw();
     m_hook.draw();
-    if (!m_gameObjects.empty()) {
+    /*if (!m_gameObjects.empty()) {
         for (const auto& obj : m_gameObjects) {
             obj->draw();
         }
-    }
+    }*/
     FlushBatchDraw();
 }
 void CGame::initGameObjects() {
@@ -599,14 +596,15 @@ void CGame::initGameObjects() {
     //m_gameObjects.push_back(std::move(obj_gold_small));
 }
 
-Game::Game() : m_game_scene(game_scene_game),
+Game::Game() : m_game_scene(game_scene_menu),
                m_menu([this](int scene) { this->m_game_scene = scene; }),
                m_signin([this](int scene) { this->m_game_scene = scene; }),
-               m_login([this](int scene) { this->m_game_scene = scene; }),
-               m_game([this](int scene) { this->m_game_scene = scene; }) {}
+               m_login([this](int scene) { this->m_game_scene = scene; })/*,
+               m_game([this](int scene) { this->m_game_scene = scene; })*/ {}
 void Game::run() {
-    loadIMAGE();
+    int i = 0;
     loadTEXT();
+    loadIMAGE();
     initgraph(WID, HEI);
     BeginBatchDraw();
     while (true) {
@@ -623,10 +621,10 @@ void Game::run() {
                 m_login.update();
                 m_login.render();
                 break;
-            case game_scene_game:
+            /*case game_scene_game:
                 m_game.update();
                 m_game.render();
-                break;
+                break;*/
             default:
                 EndBatchDraw();
                 writeTEXT();

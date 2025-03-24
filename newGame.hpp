@@ -19,7 +19,7 @@
 LinkedList<std::string> storedUsername;
 LinkedList<std::string> storedPassword;
 LinkedList<int> storedStage;
-int userIndex;
+int userIndex = 0;
 
 std::string filePath = "users.txt";
 std::string imgPath_startup = "res/img_startup.jpg";
@@ -55,6 +55,10 @@ IMAGE mask_gold_small;
 #define game_scene_signin 2
 #define game_scene_login 4
 #define game_scene_game 5   
+
+#define BIG 3
+#define MID 2
+#define SML 1
 
 const int SLEEP_TIME = 10;
 const int LENGTH_INDEX = 300;
@@ -206,7 +210,7 @@ private:
 
 class GameObject : public CObject {
 public:
-    GameObject(double x, double y, int size, IMAGE img, IMAGE mask);
+    GameObject(double x, double y, int size, IMAGE& img, IMAGE& mask);
     virtual void setRadiusAndSpeed() = 0;
     void draw();
     void retract();
@@ -230,25 +234,25 @@ protected:
 
 class Gold : public GameObject {
 public:
-    Gold(int x, int y, int size, IMAGE img, IMAGE mask);
+    Gold(int x, int y, int size, IMAGE& img, IMAGE& mask);
     void setRadiusAndSpeed() override;
 };
 
 class Rock : public GameObject {
 public:
-    Rock(int x, int y, int size, IMAGE img, IMAGE mask);
+    Rock(int x, int y, int size, IMAGE& img, IMAGE& mask);
     void setRadiusAndSpeed() override;
 };
 
 class Diamond : public GameObject {
 public:
-    Diamond(int x, int y, IMAGE img, IMAGE mask);
+    Diamond(int x, int y, IMAGE& img, IMAGE& mask);
     void setRadiusAndSpeed() override;
 };
 
 class GameObjectFactory {
 public:
-    static std::unique_ptr<GameObject> createGameObject(GameObjectType type, int x, int y, int size, IMAGE img, IMAGE mask);
+    static std::unique_ptr<GameObject> createGameObject(GameObjectType type, int x, int y, int size, IMAGE& img, IMAGE& mask);
 };
 
 class CScene {
@@ -325,7 +329,7 @@ private:
     CMenu m_menu;
     CSignin m_signin;
     CLogin m_login;
-    CGame m_game;
+    //CGame m_game;
 
 public:
     Game();

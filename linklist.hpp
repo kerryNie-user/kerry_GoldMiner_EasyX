@@ -116,7 +116,7 @@ public:
 
     T& operator[](int index) {
         if (index < 0 || index >= size_) {
-            throw std::out_of_range("Index out of range");
+            throw std::out_of_range("Index out of range for operator[]");
         }
         Node<T>* current = head;
         for (int i = 0; i < index; ++i) {
@@ -145,7 +145,7 @@ public:
 
     void removeAt(int index) {
         if (index < 0 || index >= size_) {
-            throw std::out_of_range("Index out of range");
+            throw std::out_of_range("Index out of range for removeAt");
         }
         if (index == 0) {
             Node<T>* temp = head;
