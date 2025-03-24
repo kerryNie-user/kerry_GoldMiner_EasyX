@@ -69,6 +69,7 @@ void putimgwithmask(IMAGE& img, IMAGE& mask, int x, int y) {
 #define HOOK_LENGTH 30
 #define HOOK_SPEED (SLEEP_TIME * 6 / 10)
 
+// Miner
 class Miner {
     public:
         int x;
@@ -114,6 +115,7 @@ class Miner {
         }
     };
 
+// 游戏对象类
 class GameObject {
 public:
     double x;
@@ -156,6 +158,7 @@ public:
     }
 };
 
+// 金块类
 class Gold : public GameObject {
 public:
     Gold() : GameObject() {}
@@ -174,6 +177,7 @@ public:
     }
 };
 
+// 石头类
 class Rock : public GameObject {
 public:
     Rock() : GameObject() {}
@@ -192,6 +196,7 @@ public:
     }
 };
 
+// GameObject工厂类
 class GameObjectFactory {
 public:
     static std::unique_ptr<GameObject> createGameObject(const std::string& type, int x, int y, int size, IMAGE img, IMAGE mask) {
@@ -204,6 +209,7 @@ public:
     }
 };
 
+// 钩子类
 class Hook {
 public:
     int x;
@@ -260,6 +266,7 @@ public:
     }
 };
 
+// 按钮类
 class Button {
 public:
     int x, y;
@@ -302,6 +309,7 @@ public:
         return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
     }
 };
+
 
 class Clock {
 public:
@@ -353,7 +361,7 @@ private:
     std::string displayScore = "Score: 0";
     std::string displayGoal = "Goal: 0";
 public:
-    Score(int score, int goal) : score(score), goal(goal){
+    Score(int goal) : score(0), goal(goal){
         std::ostringstream oss;
         oss << goal;
         displayGoal = "Goal: " + oss.str();

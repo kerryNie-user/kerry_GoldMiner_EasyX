@@ -45,7 +45,7 @@ public:
     void gaming();
     void endGame();
 };
-
+// Game
 Game::Game () {
     loadimage(&img_game_background, imgPath_game_background.c_str(), WID, HEI, true);
 
