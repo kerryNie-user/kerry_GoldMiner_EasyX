@@ -129,6 +129,10 @@ public:
         return size_;
     }
 
+    bool empty() const {
+        return size_ == 0;
+    }
+
     void clear() {
         while (head != nullptr) {
             Node<T>* temp = head;

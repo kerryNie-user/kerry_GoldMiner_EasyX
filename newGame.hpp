@@ -2,11 +2,18 @@
 #include <string>
 #include <chrono>
 #include <ctime>
+#include <conio.h>
+#include <locale>
+#include <codecvt>
 #include <sstream>
 #include <cmath>
 #include <iomanip>
 #include <functional>
+#include <fstream>
+#include <iostream>
 #include <graphics.h>
+#include <memory>
+#include <iomanip>
 #include "linklist.hpp"
 
 LinkedList<std::string> storedUsername;

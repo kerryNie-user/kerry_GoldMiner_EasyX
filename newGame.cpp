@@ -1,16 +1,4 @@
 #include "newGame.hpp"
-#include <conio.h>
-#include <locale>
-#include <codecvt>
-#include <fstream>
-#include <iostream>
-#include <ctime>
-#include <iomanip>
-#include <sstream>
-#include <cmath>
-#include <memory>
-#include <chrono>
-#include <functional>
 
 LinkedList<std::unique_ptr<GameObject>> m_gameObjects;
 
@@ -543,9 +531,11 @@ void CGame::update() {
     if (m_clock.isContinue()) {
         m_clock.update();
         m_hook.update();
-        for (auto& obj : m_gameObjects) {
-            if (obj->retracted()) {
-                obj->move(m_hook.getAngle());
+        if (!m_gameObjects.empty()) {
+            for (auto& obj : m_gameObjects) {
+                if (obj->retracted()) {
+                    obj->move(m_hook.getAngle());
+                }
             }
         }
         if (m_hook.isStop()) {
@@ -558,21 +548,25 @@ void CGame::update() {
                 }
             }
         }
-        auto it = m_gameObjects.begin();
-        while (it != m_gameObjects.end()) {
-            if ((*it)->isHooked(m_hook.getEndX(), m_hook.getEndY())) {
-                m_hook.setSpeed((*it)->getSpeed());
-                m_hook.retract();
-                (*it)->retract();
-                m_miner.useEnergy();
-                if (m_hook.getLength() <= HOOK_LENGTH) {
-                    m_score.get((*it)->getScore());
-                    it = m_gameObjects.erase(it);
-                    m_miner.stop();
-                    continue;
+        if (!m_gameObjects.empty()) {
+            auto it = m_gameObjects.begin();
+            while (it != m_gameObjects.end()) {
+                if ((*it)->isHooked(m_hook.getEndX(), m_hook.getEndY())) {
+                    m_hook.setSpeed((*it)->getSpeed());
+                    m_hook.retract();
+                    (*it)->retract();
+                    m_miner.useEnergy();
+                    if (m_hook.getLength() <= HOOK_LENGTH) {
+                        m_score.get((*it)->getScore());
+                        it = m_gameObjects.erase(it);
+                        m_miner.stop();
+                        continue;
+                    }
                 }
+                ++it;
             }
-            ++it;
+        } else {
+            setGameScene(game_scene_menu);
         }
     } else {
         if (m_score.reachGoal()) {
@@ -593,17 +587,19 @@ void CGame::render() {
     m_stage.draw();
     m_miner.draw();
     m_hook.draw();
-    for (const auto& obj : m_gameObjects) {
-        obj->draw();
+    if (!m_gameObjects.empty()) {
+        for (const auto& obj : m_gameObjects) {
+            obj->draw();
+        }
     }
     FlushBatchDraw();
 }
 void CGame::initGameObjects() {
-    m_gameObjects.push_back(std::move(obj_gold_big));
-    m_gameObjects.push_back(std::move(obj_gold_small));
+    //m_gameObjects.push_back(std::move(obj_gold_big));
+    //m_gameObjects.push_back(std::move(obj_gold_small));
 }
 
-Game::Game() : m_game_scene(game_scene_menu),
+Game::Game() : m_game_scene(game_scene_game),
                m_menu([this](int scene) { this->m_game_scene = scene; }),
                m_signin([this](int scene) { this->m_game_scene = scene; }),
                m_login([this](int scene) { this->m_game_scene = scene; }),
@@ -622,17 +618,14 @@ void Game::run() {
             case game_scene_signin:
                 m_signin.update();
                 m_signin.render();
-                return;
                 break;
             case game_scene_login:
                 m_login.update();
                 m_login.render();
-                return;
                 break;
             case game_scene_game:
                 m_game.update();
                 m_game.render();
-                return;
                 break;
             default:
                 EndBatchDraw();
@@ -643,9 +636,6 @@ void Game::run() {
         FlushBatchDraw();
         Sleep(SLEEP_TIME);
     }
-    EndBatchDraw();
-    writeTEXT();
-    closegraph();
 }
 bool Game::loadTEXT() {
     std::ifstream file(filePath);
