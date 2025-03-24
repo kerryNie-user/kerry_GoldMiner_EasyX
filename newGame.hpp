@@ -309,7 +309,6 @@ private:
     Stage m_stage;
     CMiner m_miner;
     CHook m_hook;
-    LinkedList<std::unique_ptr<GameObject>> m_gameObjects;
     void initGameObjects();
 }; 
 

@@ -12,6 +12,11 @@
 #include <chrono>
 #include <functional>
 
+LinkedList<std::unique_ptr<GameObject>> m_gameObjects;
+
+auto obj_gold_big = GameObjectFactory::createGameObject(GameObjectType::GOLD, 200, 200, 3, img_gold_big, mask_gold_big);
+auto obj_gold_small = GameObjectFactory::createGameObject(GameObjectType::GOLD, 500, 150, 1, img_gold_small, mask_gold_small);
+
 #define degreesToRadians(angleDegrees) ((angleDegrees) * M_PI / 180.0)
 
 void putimgwithmask(IMAGE& img, IMAGE& mask, int x, int y) {
@@ -528,50 +533,51 @@ CGame::CGame(std::function<void(int)> setGameScene) :
     m_stage(storedStage[userIndex]),
     m_miner(),
     m_hook() {
+    if (userIndex < 0 || userIndex >= storedStage.size()) {
+        std::cerr << "Invalid userIndex: " << userIndex << std::endl;
+        exit(1);
+    }
     initGameObjects();
 }
 void CGame::update() {
-    m_clock.update();
-    for (auto& obj : m_gameObjects) {
-        obj->move(m_hook.getAngle());
-    }
-    m_hook.update();
-    for (auto& obj : m_gameObjects) {
-        if (obj->retracted()) {
-            obj->move(m_hook.getAngle());
-        }
-    }
     if (m_clock.isContinue()) {
+        m_clock.update();
+        m_hook.update();
+        for (auto& obj : m_gameObjects) {
+            if (obj->retracted()) {
+                obj->move(m_hook.getAngle());
+            }
+        }
         if (m_hook.isStop()) {
-            if (kbhit()) {
+            if (kbhit() || MouseHit()) {
                 int key = _getch();
-                if (key == ' ') {
+                MOUSEMSG m = GetMouseMsg();
+                if (key == ' ' || key == '\r' || m.uMsg == WM_LBUTTONDOWN) {
                     m_hook.move();
                     m_miner.work();
                 }
             }
         }
         auto it = m_gameObjects.begin();
-        int index = 0;
         while (it != m_gameObjects.end()) {
             if ((*it)->isHooked(m_hook.getEndX(), m_hook.getEndY())) {
                 m_hook.setSpeed((*it)->getSpeed());
                 m_hook.retract();
                 (*it)->retract();
+                m_miner.useEnergy();
                 if (m_hook.getLength() <= HOOK_LENGTH) {
                     m_score.get((*it)->getScore());
-                    it = m_gameObjects.erase(it); // 使用 erase 方法并更新迭代器
+                    it = m_gameObjects.erase(it);
                     m_miner.stop();
                     continue;
                 }
             }
             ++it;
-            ++index;
         }
     } else {
         if (m_score.reachGoal()) {
             outputStatus("Stage Clear!");
-            storedStage[userIndex]++;
+            ++storedStage[userIndex];
         } else {
             outputStatus("Stage Failed!");
         }
@@ -593,8 +599,8 @@ void CGame::render() {
     FlushBatchDraw();
 }
 void CGame::initGameObjects() {
-    m_gameObjects.push_back(GameObjectFactory::createGameObject(GameObjectType::GOLD, 100, 200, 1, img_gold_small, mask_gold_small));
-    m_gameObjects.push_back(GameObjectFactory::createGameObject(GameObjectType::GOLD, 200, 300, 2, img_gold_big, mask_gold_big));
+    m_gameObjects.push_back(std::move(obj_gold_big));
+    m_gameObjects.push_back(std::move(obj_gold_small));
 }
 
 Game::Game() : m_game_scene(game_scene_menu),
@@ -616,16 +622,18 @@ void Game::run() {
             case game_scene_signin:
                 m_signin.update();
                 m_signin.render();
+                return;
                 break;
             case game_scene_login:
                 m_login.update();
                 m_login.render();
+                return;
                 break;
             case game_scene_game:
                 m_game.update();
                 m_game.render();
-                break;
                 return;
+                break;
             default:
                 EndBatchDraw();
                 writeTEXT();
@@ -677,9 +685,6 @@ void Game::loadIMAGE() {
     loadimage(&mask_gold_big, maskPath_gold_big.c_str(), 120, 120, true);
     loadimage(&img_gold_small, imgPath_gold_small.c_str(), 30, 30, true);
     loadimage(&mask_gold_small, maskPath_gold_small.c_str(), 30, 30, true);
-
-    auto obj_gold_big = GameObjectFactory::createGameObject(GameObjectType::GOLD, 200, 200, 3, img_gold_big, mask_gold_big);
-    auto obj_gold_small = GameObjectFactory::createGameObject(GameObjectType::GOLD, 500, 150, 1, img_gold_small, mask_gold_small);
 }
 bool Game::writeTEXT() {
     std::ofstream file(filePath, std::ios::trunc);
