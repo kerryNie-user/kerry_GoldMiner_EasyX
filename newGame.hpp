@@ -79,6 +79,13 @@ const int HOOK_Y = MINER_Y + MINER_H * 6 / 10;
 const int GAME_TIME = 60;
 const int SCORE_GOAL_FACTOR = 500;
 
+#define degreesToRadians(angleDegrees) ((angleDegrees) * M_PI / 180.0)
+
+void putimgwithmask(IMAGE& img, IMAGE& mask, int x, int y) {
+    putimage(x, y, &mask, NOTSRCERASE);
+    putimage(x, y, &img, SRCINVERT);
+}
+
 enum class GameObjectType {
     GOLD,
     ROCK,
@@ -87,10 +94,33 @@ enum class GameObjectType {
 
 class Clock {
 public:
-    Clock(int total);
-    void draw();
-    void update();
-    bool isContinue();
+    Clock(int total) : start(0), gameContinue(true), display("Time: 0"), total(total) {}
+    void draw() {
+        int textWidth = textwidth(display.c_str());
+        int textHeight = textheight(display.c_str());
+        int textX = (WID - textWidth - WID / 50);
+        int textY = (50 - textHeight) / 2;
+        outtextxy(textX, textY, display.c_str());
+    }
+    void update () {
+        current = clock();
+        if (start == 0) {
+            start = current;
+        } else {
+            int elapsed = (current - start) / CLOCKS_PER_SEC;
+            remain = total - elapsed;
+            if (remain <= 0) {
+                remain = 0;
+                gameContinue = false;
+            }
+        }
+        std::ostringstream oss;
+        oss << std::setfill('0') << std::setw(2) << remain;
+        display = "Time: " + oss.str();
+    }
+    bool isContinue() {
+        return gameContinue;
+    }
 private:
     int start;
     int total;
@@ -102,24 +132,55 @@ private:
 
 class Score {
 public:
-    Score(int goal);
-    void draw();
-    void get(int newScore);
-    void los(int loseScore);
-    bool reachGoal();
+    Score(int goal) : score(0), goal(goal), displayScore("Score: 0"), displayGoal("Goal: " + std::to_string(goal)) {}
+    void draw() {
+        int textWidth1 = textwidth(displayScore.c_str());
+        int textHeight1 = textheight(displayScore.c_str());
+        int textWidth2 = textwidth(displayGoal.c_str());
+        int textHeight2 = textheight(displayGoal.c_str());
+        int textX = WID / 50;
+        int textY1 = (50 - textHeight1) / 2;
+        int textY2 = (50 + textHeight2) / 2;
+        outtextxy(textX, textY1, displayScore.c_str());
+        outtextxy(textX, textY2, displayGoal.c_str());
+    }
+    void get(int newScore) {
+        score += newScore;
+        update();
+    }
+    void los(int loseScore) {
+        score -= loseScore;
+        if (score < 0) {
+            score = 0;
+        }
+        update();
+    }
+    bool reachGoal() {
+        return score >= goal;
+    }
 private:
     int score;
     int goal;
     std::string displayScore;
     std::string displayGoal;
-    void update();
+    void update() {
+        displayScore = "Score: " + std::to_string(score);
+    }
 };
 
 class Stage {
 public:
-    Stage(int stage);
-    int getStage();
-    void draw();
+    Stage(int stage) : stage(stage), display("Stage: " + std::to_string(stage)) {}
+    int getStage() {
+        return stage;
+    }
+    void draw() {
+        int textWidth = textwidth(display.c_str());
+        int textHeight = textheight(display.c_str());
+        int textX = (WID - textWidth - WID / 50);
+        int textY = (50 + textHeight) / 2;
+        outtextxy(textX, textY, display.c_str());
+    }
 private:
     int stage;
     std::string display;
@@ -135,30 +196,102 @@ public:
 
 class CButton : public CControl {
 public:
-    CButton(int x, int y, int width, int height, const std::string& buttonText, ButtonCallBack callback);
-    void simulateMouseClick(int mouseX, int mouseY);
-    void draw() override;
+    CButton(int x, int y, int width, int height, const std::string& buttonText, ButtonCallBack callback) 
+        : x(x), y(y), width(width), height(height), buttonText(buttonText), callback(callback) {}
+    void simulateMouseClick(int mouseX, int mouseY) {
+        if (isMouseInButton(mouseX, mouseY)) {
+            if (callback) {
+                callback();
+            }
+        }
+    }
+    void draw() {
+        setfillcolor(WHITE);
+        fillrectangle(x, y, x + width, y + height);
+        setbkmode(TRANSPARENT);
+        settextstyle(40, 0, _T("宋体"));
+        settextcolor(BLACK);
+        int textWidth = textwidth(_T(buttonText).c_str());
+        int textHeight = textheight(_T(buttonText).c_str());
+        int textX = x + (width - textWidth) / 2;
+        int textY = y + (height - textHeight) / 2;
+        outtextxy(textX, textY, _T(buttonText).c_str());
+    }
 private:
     int x, y;
     int width, height;
     std::string buttonText;
     ButtonCallBack callback;
-    bool isMouseInButton(int mouseX, int mouseY);
+    bool isMouseInButton(int mouseX, int mouseY) {
+        return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+    }
 };
 
 class CInputBox : public CControl {
 public:
-    CInputBox(int x, int y, int width, int height);
-    std::string getInputText() const;
-    void simulateMouseClick(int mouseX, int mouseY);
-    void draw() override;
+    CInputBox(int x, int y, int width, int height)
+    : x(x), y(y), width(width), height(height), isFocused(false) {}
+    std::string getInputText() const {
+        return inputText;
+    }
+    void simulateMouseClick(int mouseX, int mouseY) {
+        if (isMouseInButton(mouseX, mouseY)) {
+            isFocused = true;
+            handleEvent();
+        }
+    }
+    void draw() {
+        setfillcolor(isFocused ? RGB(100, 100, 100) : WHITE);
+        fillrectangle(x, y, x + width, y + height);
+        setbkmode(TRANSPARENT);
+        settextstyle(40, 0, _T("宋体"));
+        settextcolor(BLACK);
+        int textWidth = textwidth(_T(inputText).c_str());
+        int textHeight = textheight(_T(inputText).c_str());
+        int textX = x + (width - textWidth) / 2;
+        int textY = y + (height - textHeight) / 2;
+        outtextxy(textX, textY, _T(inputText).c_str());
+    }
 private:
     int x, y;
     int width, height;
     std::string inputText;
     bool isFocused;
-    void handleEvent();
-    bool isMouseInButton(int mouseX, int mouseY);
+    void handleEvent() {
+        while (true) {
+            MOUSEMSG m;
+            if (MouseHit()) {
+                m = GetMouseMsg();
+                if (m.uMsg == WM_LBUTTONDOWN) {
+                    if (isMouseInButton(m.x, m.y)) {
+                        isFocused = true;
+                    } else {
+                        isFocused = false;
+                        break;
+                    }
+                }
+            }
+            if (kbhit()) {
+                wchar_t ch = _getwch();
+                if (ch == L'\r') {
+                    isFocused = false;
+                    break;
+                } else if (ch == L'\b') {
+                    if (!inputText.empty()) {
+                        inputText.pop_back();
+                    }
+                } else {
+                    inputText += ch;
+                }
+            }
+            draw();
+            FlushBatchDraw();
+        }
+        Sleep(SLEEP_TIME);
+    }
+    bool isMouseInButton(int mouseX, int mouseY) {
+        return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+    }
 };
 
 class CObject {
@@ -226,6 +359,7 @@ public:
     int getScore() const;
     int getSpeed() const;
 protected:
+public:
     double x;
     double y;
     int size;
