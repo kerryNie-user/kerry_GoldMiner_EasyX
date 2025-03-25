@@ -2,9 +2,6 @@
 
 LinkedList<std::unique_ptr<GameObject>> m_gameObjects;
 
-std::unique_ptr<GameObject> obj_gold_big = GameObjectFactory::createGameObject(GameObjectType::GOLD, 200, 200, BIG, img_gold_big, mask_gold_big);
-std::unique_ptr<GameObject> obj_gold_small = GameObjectFactory::createGameObject(GameObjectType::GOLD, 500, 150, BIG, img_gold_small, mask_gold_small);
-
 #define degreesToRadians(angleDegrees) ((angleDegrees) * M_PI / 180.0)
 
 void putimgwithmask(IMAGE& img, IMAGE& mask, int x, int y) {
@@ -261,6 +258,10 @@ void CHook::move() {
 void CHook::retract() {
     isRetracting = true;
 }
+void CHook::stop() {
+    isMoving = false;
+    isRetracting = false;
+}
 
 GameObject::GameObject(double x, double y, int size, IMAGE& img, IMAGE& mask)
     : x(x), y(y), size(size), img(img), mask(mask) {}
@@ -330,7 +331,6 @@ void Diamond::setRadiusAndSpeed() {
 std::unique_ptr<GameObject> GameObjectFactory::createGameObject(GameObjectType type, int x, int y, int size, IMAGE& img, IMAGE& mask) {
     switch (type) {
         case GameObjectType::GOLD:
-            return nullptr;
             return std::make_unique<Gold>(x, y, size, img, mask);
         case GameObjectType::ROCK:
             return std::make_unique<Rock>(x, y, size, img, mask);
@@ -341,7 +341,7 @@ std::unique_ptr<GameObject> GameObjectFactory::createGameObject(GameObjectType t
     }
 }
 
-CScene::CScene(std::function<void(int)> setGameScene) : setGameScene(setGameScene) {}
+CScene::CScene(const std::function<void(GameSceneType)>& setGameScene) : setGameScene(setGameScene) {}
 void CScene::outputStatus(std::string text) {
     setbkmode(TRANSPARENT);
     settextcolor(BLACK);
@@ -355,7 +355,7 @@ void CScene::outputStatus(std::string text) {
     Sleep(1000);
 }
 
-CMenu::CMenu(std::function<void(int)> setGameScene) : CScene(setGameScene),
+CMenu::CMenu(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene),
     m_button_signin(0.1 * WID, 0.7 * HEI, 0.3 * WID, 0.08 * HEI, "signin", std::bind(&CMenu::callbackSignin, this)), 
     m_button_login(0.6 * WID, 0.7 * HEI, 0.3 * WID, 0.08 * HEI, "login", std::bind(&CMenu::callbackLogin, this)) {}
 void CMenu::update() {
@@ -376,16 +376,16 @@ void CMenu::render() {
     FlushBatchDraw();
 }
 void CMenu::callbackSignin() {
-    setGameScene(game_scene_signin);
+    setGameScene(GameSceneType::SIGNIN);
 }
 void CMenu::callbackLogin() {
-    setGameScene(game_scene_login);
+    setGameScene(GameSceneType::LOGIN);
 }
 
-CSignin::CSignin(std::function<void(int)> setGameScene) : CScene(setGameScene), confirm(false), 
+CSignin::CSignin(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), confirm(false), 
     m_input_username(0.34 * WID, 0.44 * HEI, 0.48 * WID, 0.12 * HEI), 
     m_input_password(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI), 
-    m_input_confirm(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI), 
+    m_input_confirm(0.34 * WID, 0.78 * HEI, 0.48 * WID, 0.12 * HEI), 
     m_button_ok(0.8 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "OK", std::bind(&CSignin::callbackOk, this)), 
     m_button_cancel(0.04 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "CANCEL", std::bind(&CSignin::callbackCancel, this)) {}
 void CSignin::update() {
@@ -427,18 +427,18 @@ void CSignin::callbackOk() {
         std::string passwordOld = m_input_password.getInputText();
         std::string passwordNew = m_input_confirm.getInputText();
         if (passwordOld == passwordNew) {
-            storedUsername.push_back(m_input_username.getInputText());
-            storedPassword.push_back(m_input_password.getInputText());
-            storedStage.push_back(1);
-            userIndex = storedUsername.size() - 1;
+            stage = 1;
+            storedUsername.push_back(username);
+            storedPassword.push_back(password);
+            storedStage.push_back(stage);
             outputStatus("Welcome in...");
-            setGameScene(game_scene_game);
+            setGameScene(GameSceneType::GAME);
         } else {
             outputStatus("Password incorrect");
         }
     } else {
-        std::string username = m_input_username.getInputText();
-        std::string password = m_input_password.getInputText();
+        username = m_input_username.getInputText();
+        password = m_input_password.getInputText();
         if (username.empty()) {
             outputStatus("Username cannot be empty");
             return;
@@ -446,8 +446,8 @@ void CSignin::callbackOk() {
             outputStatus("Password cannot be empty");
             return;
         }
-        for (userIndex = 0; userIndex < storedUsername.size(); ++userIndex) {
-            if (username == storedUsername[userIndex]) {
+        for (std::string user : storedUsername) {
+            if (username == user) {
                 outputStatus("Username has been used");
                 return;
             }
@@ -460,11 +460,11 @@ void CSignin::callbackCancel() {
     if (confirm) {
         confirm = false;
     } else {
-        setGameScene(game_scene_menu);
+        setGameScene(GameSceneType::MENU);
     }
 }
 
-CLogin::CLogin(std::function<void(int)> setGameScene) : CScene(setGameScene),
+CLogin::CLogin(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene),
     m_button_ok(0.8 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "OK", std::bind(&CLogin::callbackOk, this)),
     m_button_cancel(0.04 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "CANCEL", std::bind(&CLogin::callbackCancel, this)),
     m_input_username(0.34 * WID, 0.44 * HEI, 0.48 * WID, 0.12 * HEI),
@@ -496,135 +496,140 @@ void CLogin::render() {
     FlushBatchDraw();
 }
 void CLogin::callbackOk() {
-    std::string username = m_input_username.getInputText();
-    std::string password = m_input_password.getInputText();
-    for (userIndex = 0; userIndex < storedUsername.size(); ++userIndex) {
-        if (username == storedUsername[userIndex] && password == storedPassword[userIndex]) {
+    username = m_input_username.getInputText();
+    password = m_input_password.getInputText();
+    for (int i = 0; i < storedUsername.size(); ++i) {
+        if (username == storedUsername[i] && password == storedPassword[i]) {
+            stage = storedStage[i];
             outputStatus("Welcome back...");
-            setGameScene(game_scene_game);
+            setGameScene(GameSceneType::GAME);
             return;
         }
     }
     outputStatus("Username or Password incorrect");
 }
 void CLogin::callbackCancel() {
-    setGameScene(game_scene_menu);
+    setGameScene(GameSceneType::MENU);
 }
 
-CGame::CGame(std::function<void(int)> setGameScene) : 
-    CScene(setGameScene),
+CGame::CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene),
     m_clock(GAME_TIME),
-    m_score(SCORE_GOAL_FACTOR * storedStage[userIndex]),
-    m_stage(storedStage[userIndex]),
+    m_score(SCORE_GOAL_FACTOR * stage),
+    m_stage(stage),
     m_miner(),
-    m_hook() {
-    if (userIndex < 0 || userIndex >= storedStage.size()) {
-        std::cerr << "Invalid userIndex: " << userIndex << std::endl;
-        exit(1);
-    }
-    initGameObjects();
-}
+    m_hook() { initGameObjects(); }
 void CGame::update() {
     if (m_clock.isContinue()) {
         m_clock.update();
         m_hook.update();
-        /*if (!m_gameObjects.empty()) {
+        if (!m_gameObjects.empty()) {
             for (auto& obj : m_gameObjects) {
                 if (obj->retracted()) {
                     obj->move(m_hook.getAngle());
                 }
             }
         }
+        std::cout << m_hook.isStop() << std::endl;
         if (m_hook.isStop()) {
-            if (kbhit() || MouseHit()) {
+            if (kbhit()) {
                 int key = _getch();
+                if (key == ' ' || key == '\r') {
+                    m_hook.move();
+                    m_miner.work();
+                }
+            } else if (MouseHit()) {
                 MOUSEMSG m = GetMouseMsg();
-                if (key == ' ' || key == '\r' || m.uMsg == WM_LBUTTONDOWN) {
+                if (m.uMsg == WM_LBUTTONDOWN) {
                     m_hook.move();
                     m_miner.work();
                 }
             }
         }
         if (!m_gameObjects.empty()) {
-            auto it = m_gameObjects.begin();
-            while (it != m_gameObjects.end()) {
+            for (auto it = m_gameObjects.begin(); it != m_gameObjects.end(); ++it) {
                 if ((*it)->isHooked(m_hook.getEndX(), m_hook.getEndY())) {
+                    m_miner.useEnergy();
                     m_hook.setSpeed((*it)->getSpeed());
                     m_hook.retract();
                     (*it)->retract();
-                    m_miner.useEnergy();
                     if (m_hook.getLength() <= HOOK_LENGTH) {
                         m_score.get((*it)->getScore());
                         it = m_gameObjects.erase(it);
                         m_miner.stop();
-                        continue;
+                        m_hook.setSpeed(HOOK_SPEED);
+                        m_hook.stop();
                     }
                 }
-                ++it;
             }
         } else {
-            setGameScene(game_scene_menu);
-        }*/
+            setGameScene(GameSceneType::MENU);
+        }
     } else {
         if (m_score.reachGoal()) {
             outputStatus("Stage Clear!");
-            ++storedStage[userIndex];
+            ++stage;
         } else {
             outputStatus("Stage Failed!");
         }
-        setGameScene(game_scene_menu);
+        setGameScene(GameSceneType::MENU);
     }
 }
 void CGame::render() {
     cleardevice();
     putimage(0, 0, &img_game_background);
     putimage(0, MINER_Y + MINER_H, &img_brick);
+    setbkmode(TRANSPARENT);
+    settextstyle(40, 0, _T("宋体"));
+    settextcolor(BLACK);
     m_clock.draw();
     m_score.draw();
     m_stage.draw();
     m_miner.draw();
     m_hook.draw();
-    /*if (!m_gameObjects.empty()) {
+    if (!m_gameObjects.empty()) {
         for (const auto& obj : m_gameObjects) {
             obj->draw();
         }
-    }*/
+    }
     FlushBatchDraw();
 }
 void CGame::initGameObjects() {
-    //m_gameObjects.push_back(std::move(obj_gold_big));
-    //m_gameObjects.push_back(std::move(obj_gold_small));
+    m_gameObjects.clear();
+    m_miner.setImage(img_goldminer_1, mask_goldminer_1, img_goldminer_2, mask_goldminer_2);
+    std::unique_ptr<GameObject> obj_gold_big = GameObjectFactory::createGameObject(GameObjectType::GOLD, 200, 200, BIG, img_gold_big, mask_gold_big);
+    std::unique_ptr<GameObject> obj_gold_small = GameObjectFactory::createGameObject(GameObjectType::GOLD, 500, 150, BIG, img_gold_small, mask_gold_small);
+    m_gameObjects.push_back(std::move(obj_gold_big));
+    m_gameObjects.push_back(std::move(obj_gold_small));
 }
 
-Game::Game() : m_game_scene(game_scene_menu),
-               m_menu([this](int scene) { this->m_game_scene = scene; }),
-               m_signin([this](int scene) { this->m_game_scene = scene; }),
-               m_login([this](int scene) { this->m_game_scene = scene; })/*,
-               m_game([this](int scene) { this->m_game_scene = scene; })*/ {}
+Game::Game() : m_game_scene(GameSceneType::GAME),
+               m_menu([this](GameSceneType scene) { this->m_game_scene = scene; }),
+               m_signin([this](GameSceneType scene) { this->m_game_scene = scene; }),
+               m_login([this](GameSceneType scene) { this->m_game_scene = scene; }),
+               m_game([this](GameSceneType scene) { this->m_game_scene = scene; }) {}
 void Game::run() {
-    int i = 0;
     loadTEXT();
     loadIMAGE();
     initgraph(WID, HEI);
     BeginBatchDraw();
     while (true) {
         switch (m_game_scene) {
-            case game_scene_menu:
+            case GameSceneType::MENU:
                 m_menu.update();
                 m_menu.render();
                 break;
-            case game_scene_signin:
+            case GameSceneType::SIGNIN:
                 m_signin.update();
                 m_signin.render();
                 break;
-            case game_scene_login:
+            case GameSceneType::LOGIN:
                 m_login.update();
                 m_login.render();
                 break;
-            /*case game_scene_game:
+            case GameSceneType::GAME:
                 m_game.update();
                 m_game.render();
-                break;*/
+                break;
             default:
                 EndBatchDraw();
                 writeTEXT();
@@ -664,10 +669,10 @@ void Game::loadIMAGE() {
     loadimage(&img_signin, imgPath_signin.c_str(), WID, HEI, true);
     loadimage(&img_login, imgPath_login.c_str(), WID, HEI, true);
     loadimage(&img_game_background, imgPath_game_background.c_str(), WID, HEI, true);
-    loadimage(&img_goldminer_1, imgPath_goldminer_1.c_str(), 90, 70, true);
-    loadimage(&mask_goldminer_1, maskPath_goldminer_1.c_str(), 90, 70, true);
-    loadimage(&img_goldminer_2, imgPath_goldminer_2.c_str(), 90, 70, true);
-    loadimage(&mask_goldminer_2, maskPath_goldminer_2.c_str(), 90, 70, true);
+    loadimage(&img_goldminer_1, imgPath_goldminer_1.c_str(), MINER_W, MINER_H, true);
+    loadimage(&mask_goldminer_1, maskPath_goldminer_1.c_str(), MINER_W, MINER_H, true);
+    loadimage(&img_goldminer_2, imgPath_goldminer_2.c_str(), MINER_W, MINER_H, true);
+    loadimage(&mask_goldminer_2, maskPath_goldminer_2.c_str(), MINER_W, MINER_H, true);
     loadimage(&img_brick, imgPath_brick.c_str(), WID, 10, true);
     loadimage(&img_gold_big, imgPath_gold_big.c_str(), 120, 120, true);
     loadimage(&mask_gold_big, maskPath_gold_big.c_str(), 120, 120, true);
@@ -675,6 +680,12 @@ void Game::loadIMAGE() {
     loadimage(&mask_gold_small, maskPath_gold_small.c_str(), 30, 30, true);
 }
 bool Game::writeTEXT() {
+    for (int i = 0; i < storedUsername.size(); ++i) {
+        if (username == storedUsername[i]) {
+            storedStage[i] = stage;
+            break;
+        }
+    }
     std::ofstream file(filePath, std::ios::trunc);
     if (!file.is_open()) {
         std::cerr << "Failed to open file: " << filePath << " for signing in." << std::endl;

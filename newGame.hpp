@@ -19,7 +19,9 @@
 LinkedList<std::string> storedUsername;
 LinkedList<std::string> storedPassword;
 LinkedList<int> storedStage;
-int userIndex = 0;
+std::string username = "kerry";
+std::string password = "kerry";
+int stage = 1;
 
 std::string filePath = "users.txt";
 std::string imgPath_startup = "res/img_startup.jpg";
@@ -50,11 +52,13 @@ IMAGE mask_gold_big;
 IMAGE img_gold_small;
 IMAGE mask_gold_small;
 
-#define game_scene_end 0
-#define game_scene_menu 1
-#define game_scene_signin 2
-#define game_scene_login 4
-#define game_scene_game 5   
+enum class GameSceneType {
+    END,
+    MENU,
+    SIGNIN,
+    LOGIN,
+    GAME
+};
 
 #define BIG 3
 #define MID 2
@@ -174,9 +178,9 @@ public:
 private:
     int x, y;
     int w, h;
-    bool working;
-    bool usingEnergy;
-    bool showSecondImage;
+    bool working = false;
+    bool usingEnergy = false;
+    bool showSecondImage = false;
     std::chrono::time_point<std::chrono::system_clock> lastTime;
     IMAGE img1;
     IMAGE mask1;
@@ -197,6 +201,7 @@ public:
     double getAngle() const;
     void move();
     void retract();
+    void stop();
 private:
     int x, y;
     int endX, endY;
@@ -257,18 +262,18 @@ public:
 
 class CScene {
 public:
-    CScene(std::function<void(int)> setGameScene);
+    CScene(const std::function<void(GameSceneType)>& setGameScene);
     virtual void update() = 0;
     virtual void render() = 0;
 protected:
     int m_scene;
-    std::function<void(int)> setGameScene;
+    std::function<void(GameSceneType)> setGameScene;
     void outputStatus(std::string text);
 };
 
 class CMenu : public CScene {
 public:
-    CMenu(std::function<void(int)> setGameScene);
+    CMenu(const std::function<void(GameSceneType)>& setGameScene);
     void update() override;
     void render() override;
 private:
@@ -280,7 +285,7 @@ private:
 
 class CSignin : public CScene {
 public:
-    CSignin(std::function<void(int)> setGameScene);
+    CSignin(const std::function<void(GameSceneType)>& setGameScene);
     void update() override;
     void render() override;
 protected:
@@ -297,7 +302,7 @@ private:
 
 class CLogin : public CScene {
 public:
-    CLogin(std::function<void(int)> setGameScene);
+    CLogin(const std::function<void(GameSceneType)>& setGameScene);
     void update() override;
     void render() override;
 private:
@@ -311,7 +316,7 @@ private:
 
 class CGame : public CScene {
 public:
-    CGame(std::function<void(int)> setGameScene);
+    CGame(const std::function<void(GameSceneType)>& setGameScene);
     void update() override;
     void render() override;
 private:
@@ -321,20 +326,19 @@ private:
     CMiner m_miner;
     CHook m_hook;
     void initGameObjects();
-}; 
+};
 
 class Game {
 private:
-    int m_game_scene;
+    GameSceneType m_game_scene;
     CMenu m_menu;
     CSignin m_signin;
     CLogin m_login;
-    //CGame m_game;
+    CGame m_game;
 
 public:
     Game();
     void run();
-
 private:
     bool loadTEXT();
     void loadIMAGE();
