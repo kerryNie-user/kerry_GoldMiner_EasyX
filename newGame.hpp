@@ -77,7 +77,7 @@ const int MINER_H = 70;
 const int HOOK_X = MINER_X + MINER_W * 4 / 10;
 const int HOOK_Y = MINER_Y + MINER_H * 6 / 10;
 const int GAME_TIME = 60;
-const int SCORE_GOAL_FACTOR = 500;
+const int SCORE_GOAL_FACTOR = 800;
 
 #define degreesToRadians(angleDegrees) ((angleDegrees) * M_PI / 180.0)
 
@@ -438,11 +438,15 @@ protected:
     IMAGE mask;
 public:
     GameObject(double x, double y, int size, IMAGE& img, IMAGE& mask)
-        : x(x), y(y), size(size), img(img), mask(mask) {}
+        : x(x), y(y), size(size), img(img), mask(mask) {
+            std::cout << "GameObj w = " << img.getwidth() << " h = " << img.getheight() << std::endl;
+            std::cout << "GameObj w = " << mask.getwidth() << " h = " << mask.getheight() << std::endl;
+        }
     virtual void setRadiusAndSpeed() = 0;
     void draw() {
-        putimgwithmask(img, mask, x, y);
         circle(x + radius, y + radius, radius);
+        putimgwithmask(img, mask, x, y);
+        //std::cout << "draw at (" << x << ", " << y << ")" << " w = " << img.getwidth() << " h = " << img.getheight() << std::endl;
     }
     void retract() {
         isRetracting = true;
@@ -517,6 +521,8 @@ public:
 class GameObjectFactory {
 public:
     static std::unique_ptr<GameObject> createGameObject(GameObjectType type, int x, int y, int size, IMAGE& img, IMAGE& mask) {
+        std::cout << "GameObjFac w = " << img.getwidth() << " h = " << img.getheight() << std::endl;
+        std::cout << "GameObjFac w = " << mask.getwidth() << " h = " << mask.getheight() << std::endl;
         switch (type) {
             case GameObjectType::GOLD:
                 return std::make_unique<Gold>(x, y, size, img, mask);
@@ -749,16 +755,14 @@ public:
     CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene),
         m_clock(GAME_TIME), m_score(SCORE_GOAL_FACTOR * stage), m_stage(stage), m_miner(), m_hook() { initGameObjects(); }
     void update() override {
+        if (m_gameObjects.empty()) {
+            outputStatus("WOW,AMAZING!");
+            setGameScene(GameSceneType::END);
+            return;
+        }
         if (m_clock.isContinue()) {
             m_clock.update();
             m_hook.update();
-            if (!m_gameObjects.empty()) {
-                for (auto& obj : m_gameObjects) {
-                    if (obj->retracted()) {
-                        obj->move(m_hook.getAngle());
-                    }
-                }
-            }
             if (m_hook.isStop()) {
                 if (kbhit()) {
                     int key = _getch();
@@ -774,24 +778,22 @@ public:
                     }
                 }
             }
-            if (!m_gameObjects.empty()) {
-                for (auto it = m_gameObjects.begin(); it != m_gameObjects.end(); ++it) {
-                    if ((*it)->isHooked(m_hook.getEndX(), m_hook.getEndY())) {
-                        m_miner.useEnergy();
-                        m_hook.setSpeed((*it)->getSpeed());
-                        m_hook.retract();
-                        (*it)->retract();
-                        if (m_hook.getLength() <= HOOK_LENGTH) {
-                            m_score.get((*it)->getScore());
-                            it = m_gameObjects.erase(it);
-                            m_miner.stop();
-                            m_hook.setSpeed(HOOK_SPEED);
-                            m_hook.stop();
-                        }
+            for (auto it = m_gameObjects.begin(); it != m_gameObjects.end(); ++it) {
+                if ((*it)->isHooked(m_hook.getEndX(), m_hook.getEndY())) {
+                    (*it)->move(m_hook.getAngle());
+                    m_miner.useEnergy();
+                    m_hook.setSpeed((*it)->getSpeed());
+                    m_hook.retract();
+                    (*it)->retract();
+                    if (m_hook.getLength() <= HOOK_LENGTH) {
+                        m_score.get((*it)->getScore());
+                        it = m_gameObjects.erase(it);
+                        m_miner.stop();
+                        m_hook.setSpeed(HOOK_SPEED);
+                        m_hook.stop();
+                        break;
                     }
                 }
-            } else {
-                setGameScene(GameSceneType::MENU);
             }
         } else {
             if (m_score.reachGoal()) {
@@ -800,7 +802,7 @@ public:
             } else {
                 outputStatus("Stage Failed!");
             }
-            setGameScene(GameSceneType::MENU);
+            setGameScene(GameSceneType::END);
         }
     }
     void render() override {
@@ -815,10 +817,8 @@ public:
         m_stage.draw();
         m_miner.draw();
         m_hook.draw();
-        if (!m_gameObjects.empty()) {
-            for (const auto& obj : m_gameObjects) {
-                obj->draw();
-            }
+        for (const auto& obj : m_gameObjects) {
+            obj->draw();
         }
         FlushBatchDraw();
     }
@@ -826,10 +826,16 @@ private:
     void initGameObjects() {
         m_gameObjects.clear();
         m_miner.setImage(img_goldminer_1, mask_goldminer_1, img_goldminer_2, mask_goldminer_2);
-        std::unique_ptr<GameObject> obj_gold_big = GameObjectFactory::createGameObject(GameObjectType::GOLD, 200, 200, BIG, img_gold_big, mask_gold_big);
-        std::unique_ptr<GameObject> obj_gold_small = GameObjectFactory::createGameObject(GameObjectType::GOLD, 500, 150, SML, img_gold_small, mask_gold_small);
-        m_gameObjects.push_back(std::move(obj_gold_big));
+        std::unique_ptr<GameObject> obj_gold_big;
+        std::unique_ptr<GameObject> obj_gold_small;
+        std::cout << " w = " << img_gold_big.getwidth() << " h = " << img_gold_big.getheight() << std::endl;
+        std::cout << " w = " << mask_gold_big.getwidth() << " h = " << mask_gold_big.getheight() << std::endl;/*
+        obj_gold_small = GameObjectFactory::createGameObject(GameObjectType::GOLD, 300, 150, SML, img_gold_small, mask_gold_small);
         m_gameObjects.push_back(std::move(obj_gold_small));
+        obj_gold_small = GameObjectFactory::createGameObject(GameObjectType::GOLD, 500, 150, SML, img_gold_small, mask_gold_small);
+        m_gameObjects.push_back(std::move(obj_gold_small));*/
+        obj_gold_big = GameObjectFactory::createGameObject(GameObjectType::GOLD, 200, 200, BIG, img_gold_big, mask_gold_big);
+        m_gameObjects.push_back(std::move(obj_gold_big));
     }
 };
 
@@ -918,6 +924,14 @@ private:
         loadimage(&mask_gold_big, maskPath_gold_big.c_str(), 120, 120, true);
         loadimage(&img_gold_small, imgPath_gold_small.c_str(), 30, 30, true);
         loadimage(&mask_gold_small, maskPath_gold_small.c_str(), 30, 30, true);
+        std::cout << " w = " << img_goldminer_1.getwidth() << " h = " << img_goldminer_1.getheight() << std::endl;
+        std::cout << " w = " << mask_goldminer_1.getwidth() << " h = " << mask_goldminer_1.getheight() << std::endl;
+        std::cout << " w = " << img_goldminer_2.getwidth() << " h = " << img_goldminer_2.getheight() << std::endl;
+        std::cout << " w = " << mask_goldminer_2.getwidth() << " h = " << mask_goldminer_2.getheight() << std::endl;
+        std::cout << " w = " << img_gold_big.getwidth() << " h = " << img_gold_big.getheight() << std::endl;
+        std::cout << " w = " << mask_gold_big.getwidth() << " h = " << mask_gold_big.getheight() << std::endl;
+        std::cout << " w = " << img_gold_small.getwidth() << " h = " << img_gold_small.getheight() << std::endl;
+        std::cout << " w = " << mask_gold_small.getwidth() << " h = " << mask_gold_small.getheight() << std::endl;
     }
     bool writeTEXT() {
         for (int i = 0; i < storedUsername.size(); ++i) {
