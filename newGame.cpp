@@ -37,6 +37,8 @@ std::string imgPath_gold_big = "res/img_gold_big.jpg";
 std::string maskPath_gold_big = "res/img_gold_big_mask.jpg";
 std::string imgPath_gold_small = "res/img_gold_small.jpg";
 std::string maskPath_gold_small = "res/img_gold_small_mask.jpg";
+std::string imgPath_hook = "res/img_hook.jpg";
+std::string maskPath_hook = "res/img_hook_mask.jpg";
 std::string imgPath_game_end = "res/img_game_end.png";
 
 IMAGE img_startup;
@@ -52,6 +54,8 @@ IMAGE img_gold_big;
 IMAGE mask_gold_big;
 IMAGE img_gold_small;
 IMAGE mask_gold_small;
+IMAGE img_hook;
+IMAGE mask_hook;
 IMAGE img_game_end;
 
 #define BIG 3
@@ -71,7 +75,6 @@ const int MINER_H = 70;
 const int HOOK_X = MINER_X + MINER_W * 4 / 10;
 const int HOOK_Y = MINER_Y + MINER_H * 6 / 10;
 const int GAME_TIME = 60;
-const int SCORE_GOAL_FACTOR = 800;
 
 #define degreesToRadians(angleDegrees) ((angleDegrees) * M_PI / 180.0)
 
@@ -100,7 +103,13 @@ private:
     bool gameContinue;
     std::string display;
 public:
-    Clock(int total) : start(0), gameContinue(true), display("Time: 0"), total(total) {}
+    Clock () {}
+    void init(int total) {
+        start = 0;
+        this->total = total;
+        gameContinue = true;
+        display = "Time: 0";
+    }
     void draw() {
         int textWidth = textwidth(display.c_str());
         int textHeight = textheight(display.c_str());
@@ -131,7 +140,13 @@ public:
 
 class Score {
 public:
-    Score(int goal) : score(0), goal(goal), displayScore("Score: 0"), displayGoal("Goal: " + std::to_string(goal)) {}
+    Score () {}
+    void init(int goal) {
+        score = 0;
+        this->goal = goal;
+        displayScore = "Score: 0";
+        displayGoal = "Goal: " + std::to_string(goal);
+    }
     void draw() {
         int textWidth1 = textwidth(displayScore.c_str());
         int textHeight1 = textheight(displayScore.c_str());
@@ -172,7 +187,11 @@ private:
     int stage;
     std::string display;
 public:
-    Stage(int stage) : stage(stage), display("Stage: " + std::to_string(stage)) {}
+    Stage () {}
+    void init(int stage) {
+        this->stage = stage;
+        display = "Stage: " + std::to_string(stage);
+    }
     int getStage() {
         return stage;
     }
@@ -308,9 +327,9 @@ class CMiner : public CObject {
 private:
     int x, y;
     int w, h;
-    bool working = false;
-    bool usingEnergy = false;
-    bool showSecondImage = false;
+    bool working;
+    bool usingEnergy;
+    bool showSecondImage;
     std::chrono::time_point<std::chrono::system_clock> lastTime;
     IMAGE img1;
     IMAGE mask1;
@@ -318,7 +337,10 @@ private:
     IMAGE mask2;
 public:
     CMiner() : x(MINER_X), y(MINER_Y), w(MINER_W), h(MINER_H) {}
-    void setImage(IMAGE& img1, IMAGE& mask1, IMAGE& img2, IMAGE& mask2) {
+    void init(IMAGE& img1, IMAGE& mask1, IMAGE& img2, IMAGE& mask2) {
+        this->working = false;
+        this->usingEnergy = false;
+        this->showSecondImage = false;
         this->img1 = img1;
         this->mask1 = mask1;
         this->img2 = img2;
@@ -363,13 +385,24 @@ private:
     double angleSpeed;
     bool isMoving;
     bool isRetracting;
+    IMAGE img;
+    IMAGE mask;
+    IMAGE img_rotate;
+    IMAGE mask_rotate;
 public:
-    CHook() : x(HOOK_X), y(HOOK_Y), length(HOOK_LENGTH), speed(HOOK_SPEED), angleSpeed(SLEEP_TIME * 0.15), angle(90) {}
+    CHook() : x(HOOK_X), y(HOOK_Y), length(HOOK_LENGTH), speed(HOOK_SPEED), angleSpeed(SLEEP_TIME * 0.15) {}
+    void init(IMAGE& img, IMAGE& mask) {
+        angle = 90;
+        this->img = img;
+        this->mask = mask;
+    }
     void draw() {
         setcolor(BLACK);
         setlinestyle(PS_SOLID, 2);
         line(x, y, endX, endY);
-        circle(endX, endY, 5);
+        rotateimage(&img_rotate, &img, -degreesToRadians(angle - 90), WHITE, true);
+        rotateimage(&mask_rotate, &mask, -degreesToRadians(angle - 90), BLACK, true);
+        putimgwithmask(img_rotate, mask_rotate, endX - img.getwidth() / 2, endY);
     }
     void update() {
         endX = x + length * cos(degreesToRadians(angle));
@@ -750,13 +783,17 @@ private:
     CMiner m_miner;
     CHook m_hook;
     CButton m_button_quit;
+    bool gaming = false;
 public:
-    CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene),
-        m_clock(GAME_TIME), m_score(SCORE_GOAL_FACTOR * stage), m_stage(stage), m_miner(), m_hook(),
+    CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), m_clock(), m_score(), m_stage(), m_miner(), m_hook(),
         m_button_quit(0.65 * WID, (MINER_Y + MINER_H - 0.08 * HEI) / 2, 0.12 * WID, 0.08 * HEI, "Quit", std::bind(&CGame::callbackQuit, this)) {}
     void initGameObjects() {
         m_gameObjects.clear();
-        m_miner.setImage(img_goldminer_1, mask_goldminer_1, img_goldminer_2, mask_goldminer_2);
+        m_stage.init(stage);
+        m_clock.init(GAME_TIME);
+        m_score.init(1000 + (int)(8 * std::sqrt(stage)) * 100);
+        m_miner.init(img_goldminer_1, mask_goldminer_1, img_goldminer_2, mask_goldminer_2);
+        m_hook.init(img_hook, mask_hook);
         std::unique_ptr<GameObject> obj_gold_big;
         std::unique_ptr<GameObject> obj_gold_small;
         obj_gold_small = GameObjectFactory::createGameObject(GameObjectType::GOLD, 300, 150, SML, img_gold_small, mask_gold_small);
@@ -788,6 +825,15 @@ public:
             obj->draw();
         }
         FlushBatchDraw();
+    }
+    bool gameStarted() const {
+        return gaming;
+    }
+    void start() {
+        gaming = true;
+    }
+    void over() {
+        gaming = false;
     }
 private:
     void updateWithInput() {
@@ -934,7 +980,7 @@ private:
     CWin m_win;
     CLose m_lose;
 public:
-    Game(): m_game_scene(GameSceneType::WIN),
+    Game(): m_game_scene(GameSceneType::GAME),
             m_menu([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_signin([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_login([this](GameSceneType scene) { this->m_game_scene = scene; }),
@@ -943,7 +989,6 @@ public:
             m_lose([this](GameSceneType scene) { this->m_game_scene = scene; }) {
                 loadTEXT();
                 loadIMAGE();
-                m_game.initGameObjects();
             }
     void run() {
         initgraph(WID, HEI);
@@ -963,18 +1008,25 @@ public:
                     m_login.render();
                     break;
                 case GameSceneType::GAME:
+                    if (!m_game.gameStarted()) {
+                        m_game.initGameObjects();
+                        m_game.start();
+                    }
                     m_game.update();
                     m_game.render();
                     break;
                 case GameSceneType::WIN:
+                    m_game.over();
                     m_win.update();
                     m_win.render();
                     break;
                 case GameSceneType::LOSE:
+                    m_game.over();
                     m_lose.update();
                     m_lose.render();
                     break;
                 default:
+                    m_game.over();
                     EndBatchDraw();
                     writeTEXT();
                     closegraph();
@@ -1023,6 +1075,8 @@ private:
         loadimage(&mask_gold_big, maskPath_gold_big.c_str(), 120, 120, true);
         loadimage(&img_gold_small, imgPath_gold_small.c_str(), 30, 30, true);
         loadimage(&mask_gold_small, maskPath_gold_small.c_str(), 30, 30, true);
+        loadimage(&img_hook, imgPath_hook.c_str(), 28, 16, true);
+        loadimage(&mask_hook, maskPath_hook.c_str(), 28, 16, true);
         loadimage(&img_game_end, imgPath_game_end.c_str(), WID, HEI, true);
     }
     bool writeTEXT() {
