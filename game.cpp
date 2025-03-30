@@ -35,8 +35,16 @@ std::string maskPath_goldminer_2 = "res/img_goldminer_mask_2.jpg";
 std::string imgPath_brick = "res/img_brick.jpg";
 std::string imgPath_gold_big = "res/img_gold_big.jpg";
 std::string maskPath_gold_big = "res/img_gold_big_mask.jpg";
+std::string imgPath_gold_mid = "res/img_gold_mid.jpg";
+std::string maskPath_gold_mid = "res/img_gold_mid_mask.jpg";
 std::string imgPath_gold_small = "res/img_gold_small.jpg";
 std::string maskPath_gold_small = "res/img_gold_small_mask.jpg";
+std::string imgPath_rock_mid = "res/img_rock_mid.jpg";
+std::string maskPath_rock_mid = "res/img_rock_mid_mask.jpg";
+std::string imgPath_rock_small = "res/img_rock_small.jpg";
+std::string maskPath_rock_small = "res/img_rock_small_mask.jpg";
+std::string imgPath_diamond = "res/img_diamond.jpg";
+std::string maskPath_diamond = "res/img_diamond_mask.jpg";
 std::string imgPath_hook = "res/img_hook.jpg";
 std::string maskPath_hook = "res/img_hook_mask.jpg";
 std::string imgPath_game_end = "res/img_game_end.png";
@@ -52,8 +60,16 @@ IMAGE mask_goldminer_2;
 IMAGE img_brick;
 IMAGE img_gold_big;
 IMAGE mask_gold_big;
+IMAGE img_gold_mid;
+IMAGE mask_gold_mid;
 IMAGE img_gold_small;
 IMAGE mask_gold_small;
+IMAGE img_rock_mid;
+IMAGE mask_rock_mid;
+IMAGE img_rock_small;
+IMAGE mask_rock_small;
+IMAGE img_diamond;
+IMAGE mask_diamond;
 IMAGE img_hook;
 IMAGE mask_hook;
 IMAGE img_game_end;
@@ -474,8 +490,7 @@ protected:
     IMAGE img;
     IMAGE mask;
 public:
-    GameObject(double x, double y, int size, IMAGE& img, IMAGE& mask)
-        : x(x), y(y), size(size), img(img), mask(mask) {}
+    GameObject(double x, double y, int size, IMAGE& img, IMAGE& mask) : x(x), y(y), size(size), img(img), mask(mask) {}
     virtual void setRadiusAndSpeed() = 0;
     void draw() {
         putimgwithmask(img, mask, x, y);
@@ -507,10 +522,7 @@ public:
 
 class Gold : public GameObject {
 public:
-    Gold(int x, int y, int size, IMAGE& img, IMAGE& mask) 
-        : GameObject(x, y, size, img, mask) {
-        setRadiusAndSpeed();
-    }
+    Gold(int x, int y, int size, IMAGE& img, IMAGE& mask) : GameObject(x, y, size, img, mask) { setRadiusAndSpeed(); }
     void setRadiusAndSpeed() override {
         static const int radii[] = {0, 15, 40, 60};
         static const int speeds[] = {0, 4, 2, 1};
@@ -523,12 +535,9 @@ public:
 
 class Rock : public GameObject {
 public:
-    Rock(int x, int y, int size, IMAGE& img, IMAGE& mask) 
-        : GameObject(x, y, size, img, mask) {
-        setRadiusAndSpeed();
-    }
+    Rock(int x, int y, int size, IMAGE& img, IMAGE& mask) : GameObject(x, y, size, img, mask) { setRadiusAndSpeed(); }
     void setRadiusAndSpeed() override {
-        static const int radii[] = {0, 18, 40};
+        static const int radii[] = {0, 15, 40};
         static const int speeds[] = {0, 3, 1};
         static const int scores[] = {0, 50, 100};
         this->radius = radii[size];
@@ -539,10 +548,7 @@ public:
 
 class Diamond : public GameObject {
 public:
-    Diamond(int x, int y, IMAGE& img, IMAGE& mask)
-        : GameObject(x, y, 1, img, mask) {
-        setRadiusAndSpeed();
-    }
+    Diamond(int x, int y, IMAGE& img, IMAGE& mask) : GameObject(x, y, SML, img, mask) { setRadiusAndSpeed(); }
     void setRadiusAndSpeed() override {
         this->radius = 15;
         this->speed = 4;
@@ -795,13 +801,23 @@ public:
         m_miner.init(img_goldminer_1, mask_goldminer_1, img_goldminer_2, mask_goldminer_2);
         m_hook.init(img_hook, mask_hook);
         std::unique_ptr<GameObject> obj_gold_big;
+        std::unique_ptr<GameObject> obj_gold_mid;
         std::unique_ptr<GameObject> obj_gold_small;
-        obj_gold_small = GameObjectFactory::createGameObject(GameObjectType::GOLD, 300, 150, SML, img_gold_small, mask_gold_small);
-        m_gameObjects.push_back(std::move(obj_gold_small));
-        obj_gold_small = GameObjectFactory::createGameObject(GameObjectType::GOLD, 500, 150, SML, img_gold_small, mask_gold_small);
-        m_gameObjects.push_back(std::move(obj_gold_small));
+        std::unique_ptr<GameObject> obj_rock_mid;
+        std::unique_ptr<GameObject> obj_rock_small;
+        std::unique_ptr<GameObject> obj_diamond;
         obj_gold_big = GameObjectFactory::createGameObject(GameObjectType::GOLD, 200, 200, BIG, img_gold_big, mask_gold_big);
         m_gameObjects.push_back(std::move(obj_gold_big));
+        obj_gold_mid = GameObjectFactory::createGameObject(GameObjectType::GOLD, 400, 100, MID, img_gold_mid, mask_gold_mid);
+        m_gameObjects.push_back(std::move(obj_gold_mid));
+        obj_gold_small = GameObjectFactory::createGameObject(GameObjectType::GOLD, 300, 150, SML, img_gold_small, mask_gold_small);
+        m_gameObjects.push_back(std::move(obj_gold_small));
+        obj_rock_mid = GameObjectFactory::createGameObject(GameObjectType::ROCK, 500, 150, MID, img_rock_mid, mask_rock_mid);
+        m_gameObjects.push_back(std::move(obj_rock_mid));
+        obj_rock_small = GameObjectFactory::createGameObject(GameObjectType::ROCK, 700, 300, SML, img_rock_small, mask_rock_small);
+        m_gameObjects.push_back(std::move(obj_rock_small));
+        obj_diamond = GameObjectFactory::createGameObject(GameObjectType::DIAMOND, 300, 150, SML, img_diamond, mask_diamond);
+        m_gameObjects.push_back(std::move(obj_diamond));
     }
     void update() override {
         updateWithInput();
@@ -991,49 +1007,53 @@ public:
                 loadIMAGE();
             }
     void run() {
-        initgraph(WID, HEI);
-        BeginBatchDraw();
-        while (true) {
-            switch (m_game_scene) {
-                case GameSceneType::MENU:
-                    m_menu.update();
-                    m_menu.render();
-                    break;
-                case GameSceneType::SIGNIN:
-                    m_signin.update();
-                    m_signin.render();
-                    break;
-                case GameSceneType::LOGIN:
-                    m_login.update();
-                    m_login.render();
-                    break;
-                case GameSceneType::GAME:
-                    if (!m_game.gameStarted()) {
-                        m_game.initGameObjects();
-                        m_game.start();
-                    }
-                    m_game.update();
-                    m_game.render();
-                    break;
-                case GameSceneType::WIN:
-                    m_game.over();
-                    m_win.update();
-                    m_win.render();
-                    break;
-                case GameSceneType::LOSE:
-                    m_game.over();
-                    m_lose.update();
-                    m_lose.render();
-                    break;
-                default:
-                    m_game.over();
-                    EndBatchDraw();
-                    writeTEXT();
-                    closegraph();
-                    return;
+        if (proofreadIMAGE()) {
+            initgraph(WID, HEI);
+            BeginBatchDraw();
+            while (true) {
+                switch (m_game_scene) {
+                    case GameSceneType::MENU:
+                        m_menu.update();
+                        m_menu.render();
+                        break;
+                    case GameSceneType::SIGNIN:
+                        m_signin.update();
+                        m_signin.render();
+                        break;
+                    case GameSceneType::LOGIN:
+                        m_login.update();
+                        m_login.render();
+                        break;
+                    case GameSceneType::GAME:
+                        if (!m_game.gameStarted()) {
+                            m_game.initGameObjects();
+                            m_game.start();
+                        }
+                        m_game.update();
+                        m_game.render();
+                        break;
+                    case GameSceneType::WIN:
+                        m_game.over();
+                        m_win.update();
+                        m_win.render();
+                        break;
+                    case GameSceneType::LOSE:
+                        m_game.over();
+                        m_lose.update();
+                        m_lose.render();
+                        break;
+                    default:
+                        m_game.over();
+                        EndBatchDraw();
+                        writeTEXT();
+                        closegraph();
+                        return;
+                }
+                FlushBatchDraw();
+                Sleep(SLEEP_TIME);
             }
-            FlushBatchDraw();
-            Sleep(SLEEP_TIME);
+        } else {
+            std::cerr << "There're something wrong with image loading" << std::endl;
         }
     }
 private:
@@ -1062,34 +1082,123 @@ private:
         return true;
     }
     void loadIMAGE() {
-        loadimage(&img_startup, imgPath_startup.c_str(), WID, HEI, true);
+        loadimage(&img_startup, imgPath_startup.c_str(), WID, HEI, true);    
         loadimage(&img_signin, imgPath_signin.c_str(), WID, HEI, true);
         loadimage(&img_login, imgPath_login.c_str(), WID, HEI, true);
-        loadimage(&img_game_background, imgPath_game_background.c_str(), WID, HEI, true);
-        loadimage(&img_goldminer_1, imgPath_goldminer_1.c_str(), MINER_W, MINER_H, true);
-        loadimage(&mask_goldminer_1, maskPath_goldminer_1.c_str(), MINER_W, MINER_H, true);
-        loadimage(&img_goldminer_2, imgPath_goldminer_2.c_str(), MINER_W, MINER_H, true);
+        loadimage(&img_game_background, imgPath_game_background.c_str(), WID, HEI, true);        
+        loadimage(&img_goldminer_1, imgPath_goldminer_1.c_str(), MINER_W, MINER_H, true);        
+        loadimage(&mask_goldminer_1, maskPath_goldminer_1.c_str(), MINER_W, MINER_H, true);        
+        loadimage(&img_goldminer_2, imgPath_goldminer_2.c_str(), MINER_W, MINER_H, true);        
         loadimage(&mask_goldminer_2, maskPath_goldminer_2.c_str(), MINER_W, MINER_H, true);
         loadimage(&img_brick, imgPath_brick.c_str(), WID, 10, true);
         loadimage(&img_gold_big, imgPath_gold_big.c_str(), 120, 120, true);
         loadimage(&mask_gold_big, maskPath_gold_big.c_str(), 120, 120, true);
+        loadimage(&img_gold_mid, imgPath_gold_mid.c_str(), 80, 80, true);
+        loadimage(&mask_gold_mid, maskPath_gold_mid.c_str(), 80, 80, true);
         loadimage(&img_gold_small, imgPath_gold_small.c_str(), 30, 30, true);
         loadimage(&mask_gold_small, maskPath_gold_small.c_str(), 30, 30, true);
+        loadimage(&img_rock_mid, imgPath_rock_mid.c_str(), 80, 80, true);
+        loadimage(&mask_rock_mid, maskPath_rock_mid.c_str(), 80, 80, true);
+        loadimage(&img_rock_small, imgPath_rock_small.c_str(), 30, 30, true);
+        loadimage(&mask_rock_small, maskPath_rock_small.c_str(), 30, 30, true);
+        loadimage(&img_diamond, imgPath_diamond.c_str(), 30, 30, true);
+        loadimage(&mask_diamond, maskPath_diamond.c_str(), 30, 30, true);
         loadimage(&img_hook, imgPath_hook.c_str(), 28, 16, true);
         loadimage(&mask_hook, maskPath_hook.c_str(), 28, 16, true);
         loadimage(&img_game_end, imgPath_game_end.c_str(), WID, HEI, true);
     }
-    bool writeTEXT() {
+    bool proofreadIMAGE() {
+        if (img_startup.getwidth() != WID || img_startup.getheight() != HEI) {
+            std::cerr << "Failed to load img_startup!" << std::endl;
+            return false;
+        } else if (img_signin.getwidth() != WID || img_signin.getheight() != HEI) {
+            std::cerr << "Failed to load img_signin!" << std::endl;
+            return false;
+        } else if (img_login.getwidth() != WID || img_login.getheight() != HEI) {
+            std::cerr << "Failed to load img_login!" << std::endl;
+            return false;
+        } else if (img_game_background.getwidth() != WID || img_game_background.getheight() != HEI) {
+            std::cerr << "Failed to load img_game_background!" << std::endl;
+            return false;
+        } else if (img_goldminer_1.getwidth() != MINER_W || img_goldminer_1.getheight() != MINER_H) {
+            std::cerr << "Failed to load img_goldminer_1!" << std::endl;
+            return false;
+        } else if (mask_goldminer_1.getwidth() != MINER_W || mask_goldminer_1.getheight() != MINER_H) {
+            std::cerr << "Failed to load mask_goldminer_1!" << std::endl;
+            return false;
+        } else if (img_goldminer_2.getwidth() != MINER_W || img_goldminer_2.getheight() != MINER_H) {
+            std::cerr << "Failed to load img_goldminer_2!" << std::endl;
+            return false;
+        } else if (mask_goldminer_2.getwidth() != MINER_W || mask_goldminer_2.getheight() != MINER_H) {
+            std::cerr << "Failed to load mask_goldminer_2!" << std::endl;
+            return false;
+        } else if (img_brick.getwidth() != WID || img_brick.getheight() != 10) {
+            std::cerr << "Failed to load img_brick!" << std::endl;
+            return false;
+        } else if (img_gold_big.getwidth() != 120 || img_gold_big.getheight() != 120) {
+            std::cerr << "Failed to load img_gold_big!" << std::endl;
+            return false;
+        } else if (mask_gold_big.getwidth() != 120 || mask_gold_big.getheight() != 120) {
+            std::cerr << "Failed to load mask_gold_big!" << std::endl;
+            return false;
+        } else if (img_gold_mid.getwidth() != 80 || img_gold_mid.getheight() != 80) {
+            std::cerr << "Failed to load img_gold_mid!" << std::endl;
+            return false;
+        } else if (mask_gold_mid.getwidth() != 80 || mask_gold_mid.getheight() != 80) {
+            std::cerr << "Failed to load mask_gold_mid!" << std::endl;
+            return false;
+        } else if (img_gold_small.getwidth() != 30 || img_gold_small.getheight() != 30) {
+            std::cerr << "Failed to load img_gold_small!" << std::endl;
+            return false;
+        } else if (mask_gold_small.getwidth() != 30 || mask_gold_small.getheight() != 30) {
+            std::cerr << "Failed to load mask_gold_small!" << std::endl;
+            return false;
+        } else if (img_rock_mid.getwidth() != 80 || img_rock_mid.getheight() != 80) {
+            std::cerr << "Failed to load img_rock_mid!" << std::endl;
+            return false;
+        } else if (mask_rock_mid.getwidth() != 80 || mask_rock_mid.getheight() != 80) {
+            std::cerr << "Failed to load mask_rock_mid!" << std::endl;
+            return false;
+        } else if (img_rock_small.getwidth() != 30 || img_rock_small.getheight() != 30) {
+            std::cerr << "Failed to load img_rock_small!" << std::endl;
+            return false;
+        } else if (mask_rock_small.getwidth() != 30 || mask_rock_small.getheight() != 30) {
+            std::cerr << "Failed to load mask_rock_small!" << std::endl;
+            return false;
+        } else if (img_diamond.getwidth() != 30 || img_diamond.getheight() != 30) {
+            std::cerr << "Failed to load img_diamond!" << std::endl;
+            return false;
+        } else if (mask_diamond.getwidth() != 30 || mask_diamond.getheight() != 30) {
+            std::cerr << "Failed to load mask_diamond!" << std::endl;
+            return false;
+        } else if (img_hook.getwidth() != 28 || img_hook.getheight() != 16) {
+            std::cerr << "Failed to load img_hook!" << std::endl;
+            return false;
+        } else if (mask_hook.getwidth() != 28 || mask_hook.getheight() != 16) {
+            std::cerr << "Failed to load mask_hook!" << std::endl;
+            return false;
+        } else if (img_game_end.getwidth() != WID || img_game_end.getheight() != HEI) {
+            std::cerr << "Failed to load img_game_end!" << std::endl;
+            return false;
+        } else {
+            return true;
+        }
+    }
+    void writeTEXT() {
         for (int i = 0; i < storedUsername.size(); ++i) {
             if (username == storedUsername[i]) {
                 storedStage[i] = stage;
                 break;
             }
+            if (i == storedUsername.size() - 1) {
+                std::cerr << "Failed to find username: " << username << " when writing into the file." << std::endl;
+                return;
+            }
         }
         std::ofstream file(filePath, std::ios::trunc);
         if (!file.is_open()) {
-            std::cerr << "Failed to open file: " << filePath << " for signing in." << std::endl;
-            return false;
+            std::cerr << "Failed to open file: " << filePath << " when writing into the file." << std::endl;
+            return;
         }
         auto itUser = storedUsername.begin();
         auto itPass = storedPassword.begin();
@@ -1098,7 +1207,6 @@ private:
             file << *itUser << " " << *itPass << " " << *itStag << std::endl;
         }
         file.close();
-        return true;
     }
 };
 
