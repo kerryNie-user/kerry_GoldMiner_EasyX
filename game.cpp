@@ -47,6 +47,10 @@ std::string imgPath_diamond = "res/img_diamond.jpg";
 std::string maskPath_diamond = "res/img_diamond_mask.jpg";
 std::string imgPath_hook = "res/img_hook.jpg";
 std::string maskPath_hook = "res/img_hook_mask.jpg";
+std::string imgPath_bomb = "res/img_bomb.jpg";
+std::string maskPath_bomb = "res/img_bomb_mask.jpg";
+std::string imgPath_explosive = "res/img_explosive.jpg";
+std::string maskPath_explosive = "res/img_explosive.jpg";
 std::string imgPath_game_end = "res/img_game_end.png";
 
 IMAGE img_startup;
@@ -72,6 +76,10 @@ IMAGE img_diamond;
 IMAGE mask_diamond;
 IMAGE img_hook;
 IMAGE mask_hook;
+IMAGE img_bomb;
+IMAGE mask_bomb;
+IMAGE img_explosive;
+IMAGE mask_explosive;
 IMAGE img_game_end;
 
 #define BIG 3
@@ -90,6 +98,8 @@ const int MINER_W = 90;
 const int MINER_H = 70;
 const int HOOK_X = MINER_X + MINER_W * 4 / 10;
 const int HOOK_Y = MINER_Y + MINER_H * 6 / 10;
+const int BOMB_W = 15;
+const int BOMB_H = 30;
 const int GAME_TIME = 60;
 
 #define degreesToRadians(angleDegrees) ((angleDegrees) * M_PI / 180.0)
@@ -331,9 +341,9 @@ private:
 };
 
 class CObject {
-public:
+protected:
     virtual void draw() = 0;
-    void putimgwithmask(IMAGE& img, IMAGE& mask, int x, int y) {
+    void putimgwithmask(IMAGE& img, IMAGE& mask, int x, int y) const {
         putimage(x, y, &mask, NOTSRCERASE);
         putimage(x, y, &img, SRCINVERT);
     }
@@ -399,8 +409,8 @@ private:
     int speed;
     double angle;
     double angleSpeed;
-    bool isMoving;
-    bool isRetracting;
+    bool isMoving = false;
+    bool isRetracting = false;
     IMAGE img;
     IMAGE mask;
     IMAGE img_rotate;
@@ -408,7 +418,7 @@ private:
 public:
     CHook() : x(HOOK_X), y(HOOK_Y), length(HOOK_LENGTH), speed(HOOK_SPEED), angleSpeed(SLEEP_TIME * 0.15) {}
     void init(IMAGE& img, IMAGE& mask) {
-        angle = 90;
+        angle = 0;
         this->img = img;
         this->mask = mask;
     }
@@ -416,21 +426,26 @@ public:
         setcolor(BLACK);
         setlinestyle(PS_SOLID, 2);
         line(x, y, endX, endY);
-        rotateimage(&img_rotate, &img, -degreesToRadians(angle - 90), WHITE, true);
-        rotateimage(&mask_rotate, &mask, -degreesToRadians(angle - 90), BLACK, true);
-        putimgwithmask(img_rotate, mask_rotate, endX - img.getwidth() / 2, endY);
+        rotateimage(&img_rotate, &img, degreesToRadians(90 - angle), WHITE, true);
+        rotateimage(&mask_rotate, &mask, degreesToRadians(90 - angle), BLACK, true);
+        int imageX = endX - img.getwidth() * std::sin(degreesToRadians(angle)) / 2 - img.getheight() * (1 - std::cos(degreesToRadians(angle))) / 2;
+        int imageY = endY - img.getwidth() * std::abs(std::cos(degreesToRadians(angle))) / 2;
+        putimgwithmask(img_rotate, mask_rotate, imageX, imageY);
     }
     void update() {
+        if (isRetracting && !isMoving) {
+            std::cerr << "There's something wrong with hook update" << std::endl;
+        }
         endX = x + length * cos(degreesToRadians(angle));
         endY = y + length * sin(degreesToRadians(angle));
         if (isStop()) {
             angle += angleSpeed;
-            if (angle >= 160) {
+            if (angle >= 180) {
                 angleSpeed = -angleSpeed;
-                angle = 160;
-            } else if (angle <= 20) {
+                angle = 180;
+            } else if (angle <= 0) {
                 angleSpeed = -angleSpeed;
-                angle = 20;
+                angle = 0;
             }
         } else {
             if (!isRetracting) {
@@ -450,6 +465,9 @@ public:
     }
     bool isStop() {
         return (!isMoving) && (!isRetracting) && (length <= HOOK_LENGTH);
+    }
+    bool isRetract() {
+        return isRetracting;
     }
     void setSpeed(int speed) {
         this->speed = speed;
@@ -478,6 +496,33 @@ public:
     }
 };
 
+class CBomb : public CObject {
+private:
+    int x, y;
+    bool blowUp;
+    IMAGE imgB;
+    IMAGE maskB;
+public:
+    CBomb() : blowUp(false) {}
+    void init(IMAGE& imgB, IMAGE& maskB) {
+        this->imgB = imgB;
+        this->maskB = maskB;
+    }
+    void setXY(int x, int y) {
+        this->x = x;
+        this->y = y;
+    }
+    void draw() override {
+        putimgwithmask(imgB, maskB, x, y);
+    }
+    void blow() {
+        blowUp = true;
+    }
+    bool blowed() {
+        return blowUp;
+    }
+};
+
 class GameObject : public CObject {
 protected:
     double x;
@@ -486,6 +531,7 @@ protected:
     int radius;
     int speed;
     int score;
+    bool isBombed = false;
     bool isRetracting = false;
     IMAGE img;
     IMAGE mask;
@@ -517,6 +563,12 @@ public:
     }
     int getSpeed() const {
         return speed;
+    }
+    void bomb() {
+        isBombed = true;
+    }
+    bool bombed() const {
+        return isBombed;
     }
 };
 
@@ -573,6 +625,7 @@ public:
 };
 
 LinkedList<std::unique_ptr<GameObject>> m_gameObjects;
+LinkedList<CBomb> m_bombs;
 
 class CScene {
 protected:
@@ -788,10 +841,11 @@ private:
     Stage m_stage;
     CMiner m_miner;
     CHook m_hook;
+    CBomb m_bomb;
     CButton m_button_quit;
     bool gaming = false;
 public:
-    CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), m_clock(), m_score(), m_stage(), m_miner(), m_hook(),
+    CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), m_clock(), m_score(), m_stage(), m_miner(), m_hook(), m_bomb(),
         m_button_quit(0.65 * WID, (MINER_Y + MINER_H - 0.08 * HEI) / 2, 0.12 * WID, 0.08 * HEI, "Quit", std::bind(&CGame::callbackQuit, this)) {}
     void initGameObjects() {
         m_gameObjects.clear();
@@ -800,6 +854,7 @@ public:
         m_score.init(1000 + (int)(8 * std::sqrt(stage)) * 100);
         m_miner.init(img_goldminer_1, mask_goldminer_1, img_goldminer_2, mask_goldminer_2);
         m_hook.init(img_hook, mask_hook);
+        m_bomb.init(img_bomb, mask_bomb);
         std::unique_ptr<GameObject> obj_gold_big;
         std::unique_ptr<GameObject> obj_gold_mid;
         std::unique_ptr<GameObject> obj_gold_small;
@@ -818,6 +873,10 @@ public:
         m_gameObjects.push_back(std::move(obj_rock_small));
         obj_diamond = GameObjectFactory::createGameObject(GameObjectType::DIAMOND, 300, 150, SML, img_diamond, mask_diamond);
         m_gameObjects.push_back(std::move(obj_diamond));
+        for (int i = 0; i < 5; ++i) {
+            m_bomb.setXY(0.6 * WID + (BOMB_W + 10) * i, MINER_Y + MINER_H - BOMB_H);
+            m_bombs.push_back(m_bomb);
+        }
     }
     void update() override {
         updateWithInput();
@@ -837,6 +896,9 @@ public:
         m_miner.draw();
         m_hook.draw();
         m_button_quit.draw();
+        for (auto bomb : m_bombs) {
+            bomb.draw();
+        }
         for (const auto& obj : m_gameObjects) {
             obj->draw();
         }
@@ -859,6 +921,14 @@ private:
                 m_button_quit.simulateMouseClick(m.x, m.y);
                 m_hook.move();
                 m_miner.work();
+            } else if (m.uMsg == WM_RBUTTONDOWN && m_hook.isRetract() && m_bombs.size() > 0) {
+                m_bombs[m_bombs.size() - 1].blow();
+                m_hook.setSpeed(HOOK_SPEED);
+                for (auto it = m_gameObjects.begin(); it != m_gameObjects.end(); ++it) {
+                    if ((*it)->retracted()) {
+                        (*it)->bomb();
+                    }
+                }
             }
         }
     }
@@ -884,7 +954,14 @@ private:
             if (m_hook.isStop()) {
                 m_miner.stop();
             }
+            if (m_bombs[m_bombs.size() - 1].blowed()) {
+                m_bombs.removeAt(m_bombs.size() - 1);
+            }
             for (auto it = m_gameObjects.begin(); it != m_gameObjects.end(); ++it) {
+                if ((*it)->bombed()) {
+                    it = m_gameObjects.erase(it);
+                    break;
+                }
                 if ((*it)->retracted()) {
                     if (m_hook.isStop()) {
                         m_score.get((*it)->getScore());
@@ -1105,6 +1182,8 @@ private:
         loadimage(&mask_diamond, maskPath_diamond.c_str(), 30, 30, true);
         loadimage(&img_hook, imgPath_hook.c_str(), 28, 16, true);
         loadimage(&mask_hook, maskPath_hook.c_str(), 28, 16, true);
+        loadimage(&img_bomb, imgPath_bomb.c_str(), BOMB_W, BOMB_H, true);
+        loadimage(&mask_bomb, maskPath_bomb.c_str(), BOMB_W, BOMB_H, true);
         loadimage(&img_game_end, imgPath_game_end.c_str(), WID, HEI, true);
     }
     bool proofreadIMAGE() {
@@ -1176,6 +1255,12 @@ private:
             return false;
         } else if (mask_hook.getwidth() != 28 || mask_hook.getheight() != 16) {
             std::cerr << "Failed to load mask_hook!" << std::endl;
+            return false;
+        } else if (img_bomb.getwidth() != BOMB_W || img_bomb.getheight() != BOMB_H) {
+            std::cerr << "Failed to load img_bomb!" << std::endl;
+            return false;
+        } else if (mask_bomb.getwidth() != BOMB_W || mask_bomb.getheight() != BOMB_H) {
+            std::cerr << "Failed to load mask_bomb!" << std::endl;
             return false;
         } else if (img_game_end.getwidth() != WID || img_game_end.getheight() != HEI) {
             std::cerr << "Failed to load img_game_end!" << std::endl;
