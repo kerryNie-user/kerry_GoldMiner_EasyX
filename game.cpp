@@ -445,7 +445,7 @@ private:
 public:
     CHook() : x(HOOK_X), y(HOOK_Y), length(HOOK_LENGTH), speed(HOOK_SPEED), angleSpeed(SLEEP_TIME * 0.15) {}
     void init(IMAGE& img, IMAGE& mask) {
-        angle = 0;
+        angle = 90;
         this->img = img;
         this->mask = mask;
     }
@@ -467,12 +467,12 @@ public:
         endY = y + length * sin(degreesToRadians(angle));
         if (isStop()) {
             angle += angleSpeed;
-            if (angle >= 180) {
+            if (angle >= 160) {
                 angleSpeed = -angleSpeed;
-                angle = 180;
-            } else if (angle <= 0) {
+                angle = 160;
+            } else if (angle <= 20) {
                 angleSpeed = -angleSpeed;
-                angle = 0;
+                angle = 20;
             }
         } else {
             if (!isRetracting) {
@@ -576,7 +576,7 @@ public:
     }
     bool isHooked(int hookX, int hookY) {
         int distanceSquared = std::pow((x + radius - hookX), 2) + std::pow((y + radius - hookY), 2);
-        return distanceSquared <= radius * radius;
+        return distanceSquared - radius * radius <= 28;
     }
     void move(int moveangle) {
         x -= speed * cos(degreesToRadians(moveangle));
@@ -904,10 +904,10 @@ public:
         m_gameObjects.push_back(std::move(obj_rock_mid));
         obj_rock_small = GameObjectFactory::createGameObject(GameObjectType::ROCK, 700, 300, SML, img_rock_small, mask_rock_small);
         m_gameObjects.push_back(std::move(obj_rock_small));
-        obj_diamond = GameObjectFactory::createGameObject(GameObjectType::DIAMOND, 300, 150, SML, img_diamond, mask_diamond);
+        obj_diamond = GameObjectFactory::createGameObject(GameObjectType::DIAMOND, 400, 200, SML, img_diamond, mask_diamond);
         m_gameObjects.push_back(std::move(obj_diamond));
         for (int i = 0; i < 5; ++i) {
-            m_bomb.setXY(0.6 * WID + (BOMB_W + 10) * i, MINER_Y + MINER_H - BOMB_H);
+            m_bomb.setXY(0.56 * WID + BOMB_W * i, MINER_Y + MINER_H - BOMB_H);
             m_bombs.push_back(m_bomb);
         }
     }
@@ -1028,6 +1028,8 @@ public:
         m_button_continue(0.34 * WID, 0.44 * HEI, 0.48 * WID, 0.12 * HEI, "Continue", std::bind(&CWin::callbackContinue, this)),
         m_button_quit(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI, "Quit", std::bind(&CWin::callbackQuit, this)) {}
     void update() override {
+        m_button_continue.update();
+        m_button_quit.update();
         MOUSEMSG m;
         if (MouseHit()) {
             m = GetMouseMsg();
@@ -1067,6 +1069,8 @@ public:
         m_button_retry(0.34 * WID, 0.44 * HEI, 0.48 * WID, 0.12 * HEI, "Retry", std::bind(&CLose::callbackRetry, this)),
         m_button_quit(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI, "Quit", std::bind(&CLose::callbackQuit, this)) {}
     void update() override {
+        m_button_retry.update();
+        m_button_quit.update();
         MOUSEMSG m;
         if (MouseHit()) {
             m = GetMouseMsg();
@@ -1107,7 +1111,7 @@ private:
     CWin m_win;
     CLose m_lose;
 public:
-    Game(): m_game_scene(GameSceneType::MENU),
+    Game(): m_game_scene(GameSceneType::GAME),
             m_menu([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_signin([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_login([this](GameSceneType scene) { this->m_game_scene = scene; }),
