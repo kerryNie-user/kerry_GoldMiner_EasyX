@@ -240,35 +240,62 @@ public:
 
 class CButton : public CControl {
 private:
-    int x, y;
-    int width, height;
+    int x, y, w, h;
+    int X, Y, W, H;
+    int clickedTime = 50 / SLEEP_TIME;
+    int clickingTime = clickedTime;
+    bool clicked = false;
+    int textSize = 40;
     std::string buttonText;
     ButtonCallBack callback;
 public:
-    CButton(int x, int y, int width, int height, const std::string& buttonText, ButtonCallBack callback) 
-        : x(x), y(y), width(width), height(height), buttonText(buttonText), callback(callback) {}
+    CButton(int x, int y, int w, int h, const std::string& buttonText, ButtonCallBack callback) 
+        : x(x), y(y), w(w), h(h), X(x), Y(y), W(w), H(h), buttonText(buttonText), callback(callback) {}
     void simulateMouseClick(int mouseX, int mouseY) {
         if (isMouseInButton(mouseX, mouseY)) {
-            if (callback) {
-                callback();
+            clickingTime = 0;
+            clicked = true;
+        }
+    }
+    void update() {
+        if (clickingTime < clickedTime) {
+            if (clickingTime < clickedTime / 2) {
+                x += 1;
+                y += 1;
+                w -= 2;
+                h -= 2;
+            } else {
+                x -= 1;
+                y -= 1;
+                w += 2;
+                h += 2;
             }
+            ++clickingTime;
+        } else if (callback && clicked) {
+            x = X;
+            y = Y;
+            w = W;
+            h = H;
+            clicked = false;
+            clickingTime = clickedTime;
+            callback();
         }
     }
     void draw() {
         setfillcolor(WHITE);
-        fillrectangle(x, y, x + width, y + height);
+        fillrectangle(x, y, x + w, y + h);
         setbkmode(TRANSPARENT);
-        settextstyle(40, 0, _T("宋体"));
+        settextstyle(textSize, 0, _T("宋体"));
         settextcolor(BLACK);
         int textWidth = textwidth(_T(buttonText).c_str());
         int textHeight = textheight(_T(buttonText).c_str());
-        int textX = x + (width - textWidth) / 2;
-        int textY = y + (height - textHeight) / 2;
+        int textX = x + (w - textWidth) / 2;
+        int textY = y + (h - textHeight) / 2;
         outtextxy(textX, textY, _T(buttonText).c_str());
     }
 private:
     bool isMouseInButton(int mouseX, int mouseY) {
-        return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+        return mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
     }
 };
 
@@ -659,6 +686,8 @@ public:
         m_button_signin(0.1 * WID, 0.7 * HEI, 0.3 * WID, 0.08 * HEI, "signin", std::bind(&CMenu::callbackSignin, this)), 
         m_button_login(0.6 * WID, 0.7 * HEI, 0.3 * WID, 0.08 * HEI, "login", std::bind(&CMenu::callbackLogin, this)) {}
     void update() override{
+        m_button_signin.update();
+        m_button_login.update();
         MOUSEMSG m;
         if (MouseHit()) {
             m = GetMouseMsg();
@@ -700,6 +729,8 @@ public:
         m_button_ok(0.8 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "OK", std::bind(&CSignin::callbackOk, this)), 
         m_button_cancel(0.04 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "CANCEL", std::bind(&CSignin::callbackCancel, this)) {}
     void update() override {
+        m_button_ok.update();
+        m_button_cancel.update();
         MOUSEMSG m;
         if (MouseHit()) {
             m = GetMouseMsg();
@@ -790,6 +821,8 @@ public:
         m_input_username(0.34 * WID, 0.44 * HEI, 0.48 * WID, 0.12 * HEI),
         m_input_password(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI) {}
     void update() override {
+        m_button_ok.update();
+        m_button_cancel.update();
         MOUSEMSG m;
         if (MouseHit()) {
             m = GetMouseMsg();
@@ -933,6 +966,7 @@ private:
         }
     }
     void updateWithoutInput() {
+        m_button_quit.update();
         if (!m_clock.isContinue()) {
             if (m_score.reachGoal()) {
                 outputStatus("GOOD!");
@@ -1073,7 +1107,7 @@ private:
     CWin m_win;
     CLose m_lose;
 public:
-    Game(): m_game_scene(GameSceneType::GAME),
+    Game(): m_game_scene(GameSceneType::MENU),
             m_menu([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_signin([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_login([this](GameSceneType scene) { this->m_game_scene = scene; }),
