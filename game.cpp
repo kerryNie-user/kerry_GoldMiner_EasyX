@@ -233,56 +233,53 @@ public:
 using ButtonCallBack = std::function<void()>;
 
 class CControl {
-public:
+protected:
+    int x, y, w, h;
+    CControl(int x, int y, int w, int h) : x(x), y(y), w(w), h(h) {}
     virtual void draw() = 0;
     virtual ~CControl() {}
+    bool isMouseInButton(int mouseX, int mouseY) {
+        return mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
+    }
 };
 
 class CButton : public CControl {
 private:
-    int x, y, w, h;
     int X, Y, W, H;
-    int clickedTime = 50 / SLEEP_TIME;
-    int clickingTime = clickedTime;
-    bool clicked = false;
+    bool down = false;
+    bool up = false;
     int textSize = 40;
     std::string buttonText;
     ButtonCallBack callback;
 public:
     CButton(int x, int y, int w, int h, const std::string& buttonText, ButtonCallBack callback) 
-        : x(x), y(y), w(w), h(h), X(x), Y(y), W(w), H(h), buttonText(buttonText), callback(callback) {}
-    void simulateMouseClick(int mouseX, int mouseY) {
-        if (isMouseInButton(mouseX, mouseY)) {
-            clickingTime = 0;
-            clicked = true;
-        }
-    }
-    void update() {
-        if (clickingTime < clickedTime) {
-            if (clickingTime < clickedTime / 2) {
-                x += 1;
-                y += 1;
-                w -= 2;
-                h -= 2;
-            } else {
-                x -= 1;
-                y -= 1;
-                w += 2;
-                h += 2;
+        : CControl(x, y, w, h), X(x), Y(y), W(w), H(h), buttonText(buttonText), callback(callback) {}
+    void simulateMouseMSG(MOUSEMSG m) {
+        if (isMouseInButton(m.x, m.y)) {
+            if (m.uMsg == WM_LBUTTONDOWN) {
+                press();
+            } else if (m.uMsg == WM_LBUTTONUP) {
+                release();
             }
-            ++clickingTime;
-        } else if (callback && clicked) {
+        } else {
+            unpress();
+        }
+        if (down) {
+            x = X + W * 1 / 20;
+            y = Y + H * 1 / 20;
+            w = W * 9 / 10;
+            h = H * 9 / 10;
+        } else if (up) {
             x = X;
             y = Y;
             w = W;
             h = H;
-            clicked = false;
-            clickingTime = clickedTime;
+            up = false;
             callback();
         }
     }
     void draw() {
-        setfillcolor(WHITE);
+        setfillcolor(down ? RGB(200, 200, 200) : WHITE);
         fillrectangle(x, y, x + w, y + h);
         setbkmode(TRANSPARENT);
         settextstyle(textSize, 0, _T("宋体"));
@@ -294,20 +291,24 @@ public:
         outtextxy(textX, textY, _T(buttonText).c_str());
     }
 private:
-    bool isMouseInButton(int mouseX, int mouseY) {
-        return mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
+    void press() {
+        down = true;
+    }
+    void unpress() {
+        down = false;
+    }
+    void release() {
+        up = true;
+        down = false;
     }
 };
 
 class CInputBox : public CControl {
 private:
-    int x, y;
-    int width, height;
     std::string inputText;
-    bool isFocused;
+    bool isFocused = false;
 public:
-    CInputBox(int x, int y, int width, int height)
-    : x(x), y(y), width(width), height(height), isFocused(false) {}
+    CInputBox(int x, int y, int w, int h) : CControl(x, y, w, h) {}
     std::string getInputText() const {
         return inputText;
     }
@@ -317,16 +318,24 @@ public:
             handleEvent();
         }
     }
+    void simulateMouseMSG(MOUSEMSG m) {
+        if (isMouseInButton(m.x, m.y)) {
+            if (m.uMsg == WM_LBUTTONDOWN) {
+                isFocused = true;
+                handleEvent();
+            }
+        }
+    }
     void draw() {
         setfillcolor(isFocused ? RGB(100, 100, 100) : WHITE);
-        fillrectangle(x, y, x + width, y + height);
+        fillrectangle(x, y, x + w, y + h);
         setbkmode(TRANSPARENT);
         settextstyle(40, 0, _T("宋体"));
         settextcolor(BLACK);
         int textWidth = textwidth(_T(inputText).c_str());
         int textHeight = textheight(_T(inputText).c_str());
-        int textX = x + (width - textWidth) / 2;
-        int textY = y + (height - textHeight) / 2;
+        int textX = x + (w - textWidth) / 2;
+        int textY = y + (h - textHeight) / 2;
         outtextxy(textX, textY, _T(inputText).c_str());
     }
 private:
@@ -361,9 +370,6 @@ private:
             FlushBatchDraw();
         }
         Sleep(SLEEP_TIME);
-    }
-    bool isMouseInButton(int mouseX, int mouseY) {
-        return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
     }
 };
 
@@ -686,15 +692,11 @@ public:
         m_button_signin(0.1 * WID, 0.7 * HEI, 0.3 * WID, 0.08 * HEI, "signin", std::bind(&CMenu::callbackSignin, this)), 
         m_button_login(0.6 * WID, 0.7 * HEI, 0.3 * WID, 0.08 * HEI, "login", std::bind(&CMenu::callbackLogin, this)) {}
     void update() override{
-        m_button_signin.update();
-        m_button_login.update();
         MOUSEMSG m;
         if (MouseHit()) {
             m = GetMouseMsg();
-            if (m.uMsg == WM_LBUTTONDOWN) {
-                m_button_signin.simulateMouseClick(m.x, m.y);
-                m_button_login.simulateMouseClick(m.x, m.y);
-            }
+            m_button_signin.simulateMouseMSG(m);
+            m_button_login.simulateMouseMSG(m);
         }
     }
     void render() override {
@@ -729,21 +731,17 @@ public:
         m_button_ok(0.8 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "OK", std::bind(&CSignin::callbackOk, this)), 
         m_button_cancel(0.04 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "CANCEL", std::bind(&CSignin::callbackCancel, this)) {}
     void update() override {
-        m_button_ok.update();
-        m_button_cancel.update();
         MOUSEMSG m;
         if (MouseHit()) {
             m = GetMouseMsg();
-            if (m.uMsg == WM_LBUTTONDOWN) {
-                if (confirm) {
-                    m_input_confirm.simulateMouseClick(m.x, m.y);
-                } else {
-                    m_input_username.simulateMouseClick(m.x, m.y);
-                    m_input_password.simulateMouseClick(m.x, m.y);
-                }
-                m_button_ok.simulateMouseClick(m.x, m.y);
-                m_button_cancel.simulateMouseClick(m.x, m.y);
+            if (confirm) {
+                m_input_confirm.simulateMouseMSG(m);
+            } else {
+                m_input_username.simulateMouseMSG(m);
+                m_input_password.simulateMouseMSG(m);
             }
+            m_button_ok.simulateMouseMSG(m);
+            m_button_cancel.simulateMouseMSG(m);
         }
     }
     void render() override {
@@ -821,17 +819,13 @@ public:
         m_input_username(0.34 * WID, 0.44 * HEI, 0.48 * WID, 0.12 * HEI),
         m_input_password(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI) {}
     void update() override {
-        m_button_ok.update();
-        m_button_cancel.update();
         MOUSEMSG m;
         if (MouseHit()) {
             m = GetMouseMsg();
-            if (m.uMsg == WM_LBUTTONDOWN) {
-                m_input_username.simulateMouseClick(m.x, m.y);
-                m_input_password.simulateMouseClick(m.x, m.y);
-                m_button_ok.simulateMouseClick(m.x, m.y);
-                m_button_cancel.simulateMouseClick(m.x, m.y);
-            }
+            m_input_username.simulateMouseMSG(m);
+            m_input_password.simulateMouseMSG(m);
+            m_button_ok.simulateMouseMSG(m);
+            m_button_cancel.simulateMouseMSG(m);
         }
     }
     void render() override {
@@ -951,7 +945,6 @@ private:
         if (MouseHit()) {
             MOUSEMSG m = GetMouseMsg();
             if (m.uMsg == WM_LBUTTONDOWN) {
-                m_button_quit.simulateMouseClick(m.x, m.y);
                 m_hook.move();
                 m_miner.work();
             } else if (m.uMsg == WM_RBUTTONDOWN && m_hook.isRetract() && m_bombs.size() > 0) {
@@ -963,10 +956,10 @@ private:
                     }
                 }
             }
+            m_button_quit.simulateMouseMSG(m);
         }
     }
     void updateWithoutInput() {
-        m_button_quit.update();
         if (!m_clock.isContinue()) {
             if (m_score.reachGoal()) {
                 outputStatus("GOOD!");
@@ -1028,15 +1021,11 @@ public:
         m_button_continue(0.34 * WID, 0.44 * HEI, 0.48 * WID, 0.12 * HEI, "Continue", std::bind(&CWin::callbackContinue, this)),
         m_button_quit(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI, "Quit", std::bind(&CWin::callbackQuit, this)) {}
     void update() override {
-        m_button_continue.update();
-        m_button_quit.update();
         MOUSEMSG m;
         if (MouseHit()) {
             m = GetMouseMsg();
-            if (m.uMsg == WM_LBUTTONDOWN) {
-                m_button_continue.simulateMouseClick(m.x, m.y);
-                m_button_quit.simulateMouseClick(m.x, m.y);
-            }
+            m_button_continue.simulateMouseMSG(m);
+            m_button_quit.simulateMouseMSG(m);
         }
     }
     void render() override {
@@ -1069,15 +1058,11 @@ public:
         m_button_retry(0.34 * WID, 0.44 * HEI, 0.48 * WID, 0.12 * HEI, "Retry", std::bind(&CLose::callbackRetry, this)),
         m_button_quit(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI, "Quit", std::bind(&CLose::callbackQuit, this)) {}
     void update() override {
-        m_button_retry.update();
-        m_button_quit.update();
         MOUSEMSG m;
         if (MouseHit()) {
             m = GetMouseMsg();
-            if (m.uMsg == WM_LBUTTONDOWN) {
-                m_button_retry.simulateMouseClick(m.x, m.y);
-                m_button_quit.simulateMouseClick(m.x, m.y);
-            }
+            m_button_retry.simulateMouseMSG(m);
+            m_button_quit.simulateMouseMSG(m);
         }
     }
     void render() override {
@@ -1111,7 +1096,7 @@ private:
     CWin m_win;
     CLose m_lose;
 public:
-    Game(): m_game_scene(GameSceneType::GAME),
+    Game(): m_game_scene(GameSceneType::MENU),
             m_menu([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_signin([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_login([this](GameSceneType scene) { this->m_game_scene = scene; }),
