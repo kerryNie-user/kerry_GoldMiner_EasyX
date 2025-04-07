@@ -87,11 +87,11 @@ IMAGE img_game_end;
 #define SML 1
 
 const int SLEEP_TIME = 10;
-const int LENGTH_INDEX = 300;
+const int LENGTH_INDEX = 400;
 const int WID = 3 * LENGTH_INDEX;
 const int HEI = 2 * LENGTH_INDEX;
 const int HOOK_LENGTH = 30;
-const int HOOK_SPEED = SLEEP_TIME * 6 / 10;
+const int HOOK_SPEED = SLEEP_TIME * 7 / 10;
 const int MINER_X = (WID - 90) / 2;
 const int MINER_Y = 10;
 const int MINER_W = 90;
@@ -100,7 +100,7 @@ const int HOOK_X = MINER_X + MINER_W * 4 / 10;
 const int HOOK_Y = MINER_Y + MINER_H * 6 / 10;
 const int BOMB_W = 15;
 const int BOMB_H = 30;
-const int GAME_TIME = 60;
+const int GAME_TIME = 80;
 
 #define degreesToRadians(angleDegrees) ((angleDegrees) * M_PI / 180.0)
 
@@ -235,9 +235,25 @@ using ButtonCallBack = std::function<void()>;
 class CControl {
 protected:
     int x, y, w, h;
-    CControl(int x, int y, int w, int h) : x(x), y(y), w(w), h(h) {}
-    virtual void draw() = 0;
+    bool isFocused = false;
+    bool isReleased = false;
+    std::string text;
+    CControl(int x, int y, int w, int h, const std::string& text) : x(x), y(y), w(w), h(h), text(text) {}
     virtual ~CControl() {}
+public:
+    void draw() {
+        setfillcolor(isFocused ? RGB(200, 200, 200) : WHITE);
+        fillrectangle(x, y, x + w, y + h);
+        setbkmode(TRANSPARENT);
+        settextstyle(40, 0, _T("宋体"));
+        settextcolor(BLACK);
+        int textWidth = textwidth(_T(text).c_str());
+        int textHeight = textheight(_T(text).c_str());
+        int textX = x + (w - textWidth) / 2;
+        int textY = y + (h - textHeight) / 2;
+        outtextxy(textX, textY, _T(text).c_str());
+    }
+protected:
     bool isMouseInButton(int mouseX, int mouseY) {
         return mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
     }
@@ -246,71 +262,42 @@ protected:
 class CButton : public CControl {
 private:
     int X, Y, W, H;
-    bool down = false;
-    bool up = false;
-    int textSize = 40;
-    std::string buttonText;
     ButtonCallBack callback;
 public:
-    CButton(int x, int y, int w, int h, const std::string& buttonText, ButtonCallBack callback) 
-        : CControl(x, y, w, h), X(x), Y(y), W(w), H(h), buttonText(buttonText), callback(callback) {}
+    CButton(int x, int y, int w, int h, const std::string& text, ButtonCallBack callback) 
+        : CControl(x, y, w, h, text), X(x), Y(y), W(w), H(h), callback(callback) {}
     void simulateMouseMSG(MOUSEMSG m) {
         if (isMouseInButton(m.x, m.y)) {
             if (m.uMsg == WM_LBUTTONDOWN) {
-                press();
+                isFocused = true;
             } else if (m.uMsg == WM_LBUTTONUP) {
-                release();
+                isFocused = false;
+                isReleased = true;
             }
         } else {
-            unpress();
+            isFocused = false;
         }
-        if (down) {
+        if (isFocused) {
             x = X + W * 1 / 20;
             y = Y + H * 1 / 20;
             w = W * 9 / 10;
             h = H * 9 / 10;
-        } else if (up) {
+        } else if (isReleased) {
             x = X;
             y = Y;
             w = W;
             h = H;
-            up = false;
+            isReleased = false;
             callback();
         }
-    }
-    void draw() {
-        setfillcolor(down ? RGB(200, 200, 200) : WHITE);
-        fillrectangle(x, y, x + w, y + h);
-        setbkmode(TRANSPARENT);
-        settextstyle(textSize, 0, _T("宋体"));
-        settextcolor(BLACK);
-        int textWidth = textwidth(_T(buttonText).c_str());
-        int textHeight = textheight(_T(buttonText).c_str());
-        int textX = x + (w - textWidth) / 2;
-        int textY = y + (h - textHeight) / 2;
-        outtextxy(textX, textY, _T(buttonText).c_str());
-    }
-private:
-    void press() {
-        down = true;
-    }
-    void unpress() {
-        down = false;
-    }
-    void release() {
-        up = true;
-        down = false;
     }
 };
 
 class CInputBox : public CControl {
-private:
-    std::string inputText;
-    bool isFocused = false;
 public:
-    CInputBox(int x, int y, int w, int h) : CControl(x, y, w, h) {}
+    CInputBox(int x, int y, int w, int h) : CControl(x, y, w, h, "") {}
     std::string getInputText() const {
-        return inputText;
+        return text;
     }
     void simulateMouseClick(int mouseX, int mouseY) {
         if (isMouseInButton(mouseX, mouseY)) {
@@ -325,18 +312,6 @@ public:
                 handleEvent();
             }
         }
-    }
-    void draw() {
-        setfillcolor(isFocused ? RGB(100, 100, 100) : WHITE);
-        fillrectangle(x, y, x + w, y + h);
-        setbkmode(TRANSPARENT);
-        settextstyle(40, 0, _T("宋体"));
-        settextcolor(BLACK);
-        int textWidth = textwidth(_T(inputText).c_str());
-        int textHeight = textheight(_T(inputText).c_str());
-        int textX = x + (w - textWidth) / 2;
-        int textY = y + (h - textHeight) / 2;
-        outtextxy(textX, textY, _T(inputText).c_str());
     }
 private:
     void handleEvent() {
@@ -359,11 +334,11 @@ private:
                     isFocused = false;
                     break;
                 } else if (ch == L'\b') {
-                    if (!inputText.empty()) {
-                        inputText.pop_back();
+                    if (!text.empty()) {
+                        text.pop_back();
                     }
                 } else {
-                    inputText += ch;
+                    text += ch;
                 }
             }
             draw();
@@ -582,7 +557,7 @@ public:
     }
     bool isHooked(int hookX, int hookY) {
         int distanceSquared = std::pow((x + radius - hookX), 2) + std::pow((y + radius - hookY), 2);
-        return distanceSquared - radius * radius <= 28;
+        return distanceSquared - radius * radius <= 35;
     }
     void move(int moveangle) {
         x -= speed * cos(degreesToRadians(moveangle));
@@ -609,7 +584,7 @@ class Gold : public GameObject {
 public:
     Gold(int x, int y, int size, IMAGE& img, IMAGE& mask) : GameObject(x, y, size, img, mask) { setRadiusAndSpeed(); }
     void setRadiusAndSpeed() override {
-        static const int radii[] = {0, 15, 40, 60};
+        static const int radii[] = {0, 25, 50, 75};
         static const int speeds[] = {0, 4, 2, 1};
         static const int scores[] = {0, 100, 300, 500};
         this->radius = radii[size];
@@ -622,7 +597,7 @@ class Rock : public GameObject {
 public:
     Rock(int x, int y, int size, IMAGE& img, IMAGE& mask) : GameObject(x, y, size, img, mask) { setRadiusAndSpeed(); }
     void setRadiusAndSpeed() override {
-        static const int radii[] = {0, 15, 40};
+        static const int radii[] = {0, 25, 50};
         static const int speeds[] = {0, 3, 1};
         static const int scores[] = {0, 50, 100};
         this->radius = radii[size];
@@ -635,7 +610,7 @@ class Diamond : public GameObject {
 public:
     Diamond(int x, int y, IMAGE& img, IMAGE& mask) : GameObject(x, y, SML, img, mask) { setRadiusAndSpeed(); }
     void setRadiusAndSpeed() override {
-        this->radius = 15;
+        this->radius = 20;
         this->speed = 4;
         this->score = 1000;
     }
@@ -1191,20 +1166,20 @@ private:
         loadimage(&img_goldminer_2, imgPath_goldminer_2.c_str(), MINER_W, MINER_H, true);        
         loadimage(&mask_goldminer_2, maskPath_goldminer_2.c_str(), MINER_W, MINER_H, true);
         loadimage(&img_brick, imgPath_brick.c_str(), WID, 10, true);
-        loadimage(&img_gold_big, imgPath_gold_big.c_str(), 120, 120, true);
-        loadimage(&mask_gold_big, maskPath_gold_big.c_str(), 120, 120, true);
-        loadimage(&img_gold_mid, imgPath_gold_mid.c_str(), 80, 80, true);
-        loadimage(&mask_gold_mid, maskPath_gold_mid.c_str(), 80, 80, true);
-        loadimage(&img_gold_small, imgPath_gold_small.c_str(), 30, 30, true);
-        loadimage(&mask_gold_small, maskPath_gold_small.c_str(), 30, 30, true);
-        loadimage(&img_rock_mid, imgPath_rock_mid.c_str(), 80, 80, true);
-        loadimage(&mask_rock_mid, maskPath_rock_mid.c_str(), 80, 80, true);
-        loadimage(&img_rock_small, imgPath_rock_small.c_str(), 30, 30, true);
-        loadimage(&mask_rock_small, maskPath_rock_small.c_str(), 30, 30, true);
-        loadimage(&img_diamond, imgPath_diamond.c_str(), 30, 30, true);
-        loadimage(&mask_diamond, maskPath_diamond.c_str(), 30, 30, true);
-        loadimage(&img_hook, imgPath_hook.c_str(), 28, 16, true);
-        loadimage(&mask_hook, maskPath_hook.c_str(), 28, 16, true);
+        loadimage(&img_gold_big, imgPath_gold_big.c_str(), 150, 150, true);
+        loadimage(&mask_gold_big, maskPath_gold_big.c_str(), 150, 150, true);
+        loadimage(&img_gold_mid, imgPath_gold_mid.c_str(), 100, 100, true);
+        loadimage(&mask_gold_mid, maskPath_gold_mid.c_str(), 100, 100, true);
+        loadimage(&img_gold_small, imgPath_gold_small.c_str(), 50, 50, true);
+        loadimage(&mask_gold_small, maskPath_gold_small.c_str(), 50, 50, true);
+        loadimage(&img_rock_mid, imgPath_rock_mid.c_str(), 100, 100, true);
+        loadimage(&mask_rock_mid, maskPath_rock_mid.c_str(), 100, 100, true);
+        loadimage(&img_rock_small, imgPath_rock_small.c_str(), 50, 50, true);
+        loadimage(&mask_rock_small, maskPath_rock_small.c_str(), 50, 50, true);
+        loadimage(&img_diamond, imgPath_diamond.c_str(), 40, 40, true);
+        loadimage(&mask_diamond, maskPath_diamond.c_str(), 40, 40, true);
+        loadimage(&img_hook, imgPath_hook.c_str(), 35, 20, true);
+        loadimage(&mask_hook, maskPath_hook.c_str(), 35, 20, true);
         loadimage(&img_bomb, imgPath_bomb.c_str(), BOMB_W, BOMB_H, true);
         loadimage(&mask_bomb, maskPath_bomb.c_str(), BOMB_W, BOMB_H, true);
         loadimage(&img_game_end, imgPath_game_end.c_str(), WID, HEI, true);
@@ -1237,46 +1212,46 @@ private:
         } else if (img_brick.getwidth() != WID || img_brick.getheight() != 10) {
             std::cerr << "Failed to load img_brick!" << std::endl;
             return false;
-        } else if (img_gold_big.getwidth() != 120 || img_gold_big.getheight() != 120) {
+        } else if (img_gold_big.getwidth() != 150 || img_gold_big.getheight() != 150) {
             std::cerr << "Failed to load img_gold_big!" << std::endl;
             return false;
-        } else if (mask_gold_big.getwidth() != 120 || mask_gold_big.getheight() != 120) {
+        } else if (mask_gold_big.getwidth() != 150 || mask_gold_big.getheight() != 150) {
             std::cerr << "Failed to load mask_gold_big!" << std::endl;
             return false;
-        } else if (img_gold_mid.getwidth() != 80 || img_gold_mid.getheight() != 80) {
+        } else if (img_gold_mid.getwidth() != 100 || img_gold_mid.getheight() != 100) {
             std::cerr << "Failed to load img_gold_mid!" << std::endl;
             return false;
-        } else if (mask_gold_mid.getwidth() != 80 || mask_gold_mid.getheight() != 80) {
+        } else if (mask_gold_mid.getwidth() != 100 || mask_gold_mid.getheight() != 100) {
             std::cerr << "Failed to load mask_gold_mid!" << std::endl;
             return false;
-        } else if (img_gold_small.getwidth() != 30 || img_gold_small.getheight() != 30) {
+        } else if (img_gold_small.getwidth() != 50 || img_gold_small.getheight() != 50) {
             std::cerr << "Failed to load img_gold_small!" << std::endl;
             return false;
-        } else if (mask_gold_small.getwidth() != 30 || mask_gold_small.getheight() != 30) {
+        } else if (mask_gold_small.getwidth() != 50 || mask_gold_small.getheight() != 50) {
             std::cerr << "Failed to load mask_gold_small!" << std::endl;
             return false;
-        } else if (img_rock_mid.getwidth() != 80 || img_rock_mid.getheight() != 80) {
+        } else if (img_rock_mid.getwidth() != 100 || img_rock_mid.getheight() != 100) {
             std::cerr << "Failed to load img_rock_mid!" << std::endl;
             return false;
-        } else if (mask_rock_mid.getwidth() != 80 || mask_rock_mid.getheight() != 80) {
+        } else if (mask_rock_mid.getwidth() != 100 || mask_rock_mid.getheight() != 100) {
             std::cerr << "Failed to load mask_rock_mid!" << std::endl;
             return false;
-        } else if (img_rock_small.getwidth() != 30 || img_rock_small.getheight() != 30) {
+        } else if (img_rock_small.getwidth() != 50 || img_rock_small.getheight() != 50) {
             std::cerr << "Failed to load img_rock_small!" << std::endl;
             return false;
-        } else if (mask_rock_small.getwidth() != 30 || mask_rock_small.getheight() != 30) {
+        } else if (mask_rock_small.getwidth() != 50 || mask_rock_small.getheight() != 50) {
             std::cerr << "Failed to load mask_rock_small!" << std::endl;
             return false;
-        } else if (img_diamond.getwidth() != 30 || img_diamond.getheight() != 30) {
+        } else if (img_diamond.getwidth() != 40 || img_diamond.getheight() != 40) {
             std::cerr << "Failed to load img_diamond!" << std::endl;
             return false;
-        } else if (mask_diamond.getwidth() != 30 || mask_diamond.getheight() != 30) {
+        } else if (mask_diamond.getwidth() != 40 || mask_diamond.getheight() != 40) {
             std::cerr << "Failed to load mask_diamond!" << std::endl;
             return false;
-        } else if (img_hook.getwidth() != 28 || img_hook.getheight() != 16) {
+        } else if (img_hook.getwidth() != 35 || img_hook.getheight() != 20) {
             std::cerr << "Failed to load img_hook!" << std::endl;
             return false;
-        } else if (mask_hook.getwidth() != 28 || mask_hook.getheight() != 16) {
+        } else if (mask_hook.getwidth() != 35 || mask_hook.getheight() != 20) {
             std::cerr << "Failed to load mask_hook!" << std::endl;
             return false;
         } else if (img_bomb.getwidth() != BOMB_W || img_bomb.getheight() != BOMB_H) {
