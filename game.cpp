@@ -82,10 +82,6 @@ IMAGE img_explosive;
 IMAGE mask_explosive;
 IMAGE img_game_end;
 
-#define BIG 3
-#define MID 2
-#define SML 1
-
 const int SLEEP_TIME = 10;
 const int LENGTH_INDEX = 400;
 const int WID = 3 * LENGTH_INDEX;
@@ -101,6 +97,19 @@ const int HOOK_Y = MINER_Y + MINER_H * 6 / 10;
 const int BOMB_W = 15;
 const int BOMB_H = 30;
 const int GAME_TIME = 80;
+
+struct GoldRadiusType {
+    static constexpr int BIG = 75;
+    static constexpr int MID = 50;
+    static constexpr int SMALL = 25;
+};
+struct RockRadiusType {
+    static constexpr int MID = 50;
+    static constexpr int SMALL = 25;
+};
+struct DiamondRadiusType {
+    static constexpr int SMALL = 20;
+};
 
 #define degreesToRadians(angleDegrees) ((angleDegrees) * M_PI / 180.0)
 
@@ -535,7 +544,6 @@ class GameObject : public CObject {
 protected:
     double x;
     double y;
-    int size;
     int radius;
     int speed;
     int score;
@@ -544,8 +552,7 @@ protected:
     IMAGE img;
     IMAGE mask;
 public:
-    GameObject(double x, double y, int size, IMAGE& img, IMAGE& mask) : x(x), y(y), size(size), img(img), mask(mask) {}
-    virtual void setRadiusAndSpeed() = 0;
+    GameObject(double x, double y, const int radiusType, IMAGE& img, IMAGE& mask) : x(x), y(y), radius(radiusType), img(img), mask(mask) {}
     void draw() {
         putimgwithmask(img, mask, x, y);
     }
@@ -564,53 +571,45 @@ public:
         y -= speed * sin(degreesToRadians(moveangle));
     }
     bool operator==(const GameObject& other) const {
-        return this->x == other.x && this->y == other.y && this->size == other.size;
+        return this->x == other.x && this->y == other.y && this->radius == other.radius;
     }
-    int getScore() const {
-        return score;
-    }
-    int getSpeed() const {
-        return speed;
-    }
-    void bomb() {
-        isBombed = true;
-    }
-    bool bombed() const {
-        return isBombed;
-    }
+    int getScore() const { return score; }
+    int getSpeed() const { return speed; }
+    int getRadius() const { return radius; }
+    int getRx() const { return x + radius; }
+    int getRy() const { return y + radius; }
+    void bomb() { isBombed = true; }
+    bool bombed() const { return isBombed; }
 };
 
 class Gold : public GameObject {
 public:
-    Gold(int x, int y, int size, IMAGE& img, IMAGE& mask) : GameObject(x, y, size, img, mask) { setRadiusAndSpeed(); }
-    void setRadiusAndSpeed() override {
-        static const int radii[] = {0, 25, 50, 75};
+    Gold(int x, int y, int radiusType, IMAGE& img, IMAGE& mask) : GameObject(x, y, radiusType, img, mask) {
+        int index = (radiusType == GoldRadiusType::BIG) ? 3 : (radiusType == GoldRadiusType::MID) ? 2 : (radiusType == GoldRadiusType::SMALL) ? 1 : 0;
         static const int speeds[] = {0, 4, 2, 1};
         static const int scores[] = {0, 100, 300, 500};
-        this->radius = radii[size];
-        this->speed = speeds[size];
-        this->score = scores[size];
+        this->radius = radius;
+        this->speed = speeds[index];
+        this->score = scores[index];
     }
 };
 
 class Rock : public GameObject {
 public:
-    Rock(int x, int y, int size, IMAGE& img, IMAGE& mask) : GameObject(x, y, size, img, mask) { setRadiusAndSpeed(); }
-    void setRadiusAndSpeed() override {
-        static const int radii[] = {0, 25, 50};
+    Rock(int x, int y, int radiusType, IMAGE& img, IMAGE& mask) : GameObject(x, y, radiusType, img, mask) {
+        int index = (radiusType == GoldRadiusType::MID) ? 2 : (radiusType == GoldRadiusType::SMALL) ? 1 : 0;
         static const int speeds[] = {0, 3, 1};
         static const int scores[] = {0, 50, 100};
-        this->radius = radii[size];
-        this->speed = speeds[size];
-        this->score = scores[size];
+        this->radius = radius;
+        this->speed = speeds[index];
+        this->score = scores[index];
     }
 };
 
 class Diamond : public GameObject {
 public:
-    Diamond(int x, int y, IMAGE& img, IMAGE& mask) : GameObject(x, y, SML, img, mask) { setRadiusAndSpeed(); }
-    void setRadiusAndSpeed() override {
-        this->radius = 20;
+    Diamond(int x, int y, int radiusType, IMAGE& img, IMAGE& mask) : GameObject(x, y, radiusType, img, mask) {
+        this->radius = DiamondRadiusType::SMALL;
         this->speed = 4;
         this->score = 1000;
     }
@@ -618,14 +617,14 @@ public:
 
 class GameObjectFactory {
 public:
-    static std::unique_ptr<GameObject> createGameObject(GameObjectType type, int x, int y, int size, IMAGE& img, IMAGE& mask) {
+    static std::unique_ptr<GameObject> createGameObject(GameObjectType type, int x, int y, int radiusType, IMAGE& img, IMAGE& mask) {
         switch (type) {
             case GameObjectType::GOLD:
-                return std::make_unique<Gold>(x, y, size, img, mask);
+                return std::make_unique<Gold>(x, y, radiusType, img, mask);
             case GameObjectType::ROCK:
-                return std::make_unique<Rock>(x, y, size, img, mask);
+                return std::make_unique<Rock>(x, y, radiusType, img, mask);
             case GameObjectType::DIAMOND:
-                return std::make_unique<Diamond>(x, y, img, mask);
+                return std::make_unique<Diamond>(x, y, radiusType, img, mask);
             default:
                 return nullptr;
         }
@@ -836,6 +835,8 @@ private:
     }
 };
 
+int goal = 0;
+
 class CGame : public CScene {
 private:
     Clock m_clock;
@@ -846,39 +847,21 @@ private:
     CBomb m_bomb;
     CButton m_button_quit;
     bool gaming = false;
+    bool isSpecialLevel = false;
 public:
     CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), m_clock(), m_score(), m_stage(), m_miner(), m_hook(), m_bomb(),
         m_button_quit(0.65 * WID, (MINER_Y + MINER_H - 0.08 * HEI) / 2, 0.12 * WID, 0.08 * HEI, "Quit", std::bind(&CGame::callbackQuit, this)) {}
     void initGameObjects() {
+        goal = 1000 + (int)(6 * std::sqrt(stage)) * 100;
         m_gameObjects.clear();
         m_stage.init(stage);
         m_clock.init(GAME_TIME);
-        m_score.init(1000 + (int)(8 * std::sqrt(stage)) * 100);
+        m_score.init(goal);
         m_miner.init(img_goldminer_1, mask_goldminer_1, img_goldminer_2, mask_goldminer_2);
         m_hook.init(img_hook, mask_hook);
         m_bomb.init(img_bomb, mask_bomb);
-        std::unique_ptr<GameObject> obj_gold_big;
-        std::unique_ptr<GameObject> obj_gold_mid;
-        std::unique_ptr<GameObject> obj_gold_small;
-        std::unique_ptr<GameObject> obj_rock_mid;
-        std::unique_ptr<GameObject> obj_rock_small;
-        std::unique_ptr<GameObject> obj_diamond;
-        obj_gold_big = GameObjectFactory::createGameObject(GameObjectType::GOLD, 200, 200, BIG, img_gold_big, mask_gold_big);
-        m_gameObjects.push_back(std::move(obj_gold_big));
-        obj_gold_mid = GameObjectFactory::createGameObject(GameObjectType::GOLD, 400, 100, MID, img_gold_mid, mask_gold_mid);
-        m_gameObjects.push_back(std::move(obj_gold_mid));
-        obj_gold_small = GameObjectFactory::createGameObject(GameObjectType::GOLD, 300, 150, SML, img_gold_small, mask_gold_small);
-        m_gameObjects.push_back(std::move(obj_gold_small));
-        obj_rock_mid = GameObjectFactory::createGameObject(GameObjectType::ROCK, 500, 150, MID, img_rock_mid, mask_rock_mid);
-        m_gameObjects.push_back(std::move(obj_rock_mid));
-        obj_rock_small = GameObjectFactory::createGameObject(GameObjectType::ROCK, 700, 300, SML, img_rock_small, mask_rock_small);
-        m_gameObjects.push_back(std::move(obj_rock_small));
-        obj_diamond = GameObjectFactory::createGameObject(GameObjectType::DIAMOND, 400, 200, SML, img_diamond, mask_diamond);
-        m_gameObjects.push_back(std::move(obj_diamond));
-        for (int i = 0; i < 5; ++i) {
-            m_bomb.setXY(0.56 * WID + BOMB_W * i, MINER_Y + MINER_H - BOMB_H);
-            m_bombs.push_back(m_bomb);
-        }
+        init_m_GameObjects();
+        init_m_Boombs();
     }
     void update() override {
         updateWithInput();
@@ -979,6 +962,82 @@ private:
                     (*it)->retract();
                 }
             }
+        }
+    }
+    void init_m_GameObjects() {
+        // diamond : 1 ~ 2   -> 1000 * num scores
+        // gold : 5 ~ 11     -> 320 * num scores
+        //   big : 30% 500
+        //   mid : 50% 300
+        //   sml : 20% 100
+        // rock : 3 ~ 7      -> 75 * num scores
+        //   mid : 50% 100
+        //   sml : 50% 50
+        m_gameObjects.clear();
+        int num_index = tanh(stage);
+        int num_gold = 0;
+        int num_rock = 0;
+        int num_diamond = 0;
+        if (isSpecialLevel) {} else {
+            num_diamond = num_index + rand() % 2;
+            num_gold = 3 + 8 * num_index + rand() % 3;
+            num_rock = 3 + 3 * num_index + rand() % 2;
+            while (1000 * num_diamond + 320 * num_gold + 75 * num_rock - goal < 500) {
+                int random = rand() % 20;
+                if (random == 0) {
+                    ++ num_diamond;
+                } else if (random < 8) {
+                    ++ num_gold;
+                } else {
+                    ++ num_rock;
+                }
+            }
+            int num_gold_big = num_gold * 0.3;
+            int num_gold_mid = num_gold * 0.5;
+            int num_gold_sml = num_gold * 0.2;
+            int num_rock_mid = num_rock * 0.5;
+            int num_rock_sml = num_rock * 0.5;
+
+            initOneTypeOfGameObjects(num_diamond, GameObjectType::DIAMOND, DiamondRadiusType::SMALL, img_diamond, mask_diamond);
+            initOneTypeOfGameObjects(num_gold_big, GameObjectType::GOLD, GoldRadiusType::BIG, img_gold_big, mask_gold_big);
+            initOneTypeOfGameObjects(num_gold_mid, GameObjectType::GOLD, GoldRadiusType::MID, img_gold_mid, mask_gold_mid);
+            initOneTypeOfGameObjects(num_gold_sml, GameObjectType::GOLD, GoldRadiusType::SMALL, img_gold_small, mask_gold_small);
+            initOneTypeOfGameObjects(num_rock_mid, GameObjectType::ROCK, RockRadiusType::MID, img_rock_mid, mask_rock_mid);
+            initOneTypeOfGameObjects(num_rock_sml, GameObjectType::ROCK, RockRadiusType::SMALL, img_rock_small, mask_rock_small);
+        }
+    }
+    void initOneTypeOfGameObjects(int num, GameObjectType type, int radius, IMAGE& img, IMAGE& mask) {
+        int x, y;
+        std::unique_ptr<GameObject> obj;
+        for (int i = 0; i < num; ++i) {
+            do {
+                x = rand() % (WID - img.getwidth());
+                y = rand() % (HEI - img.getheight());
+            } while (outOfBounds(x, y, radius) || isTooClose(x, y, radius));
+            obj = GameObjectFactory::createGameObject(type, x, y, radius, img, mask);
+            m_gameObjects.push_back(std::move(obj));
+        }
+    }
+    bool isTooClose(int x, int y, int radius) {
+        for (auto it = m_gameObjects.begin(); it != m_gameObjects.end(); ++it) {
+            if (abs((*it)->getRx() - x) < (*it)->getRadius() + radius + 0.1 * LENGTH_INDEX || 
+                abs((*it)->getRy() - y) < (*it)->getRadius() + radius + 0.1 * LENGTH_INDEX) {
+                return true;
+            }
+        }
+        return true;
+    }
+    bool outOfBounds(int x, int y, int radius) {
+        if (WID - radius - 20 <= 20 || HEI - radius - 20 <= WID / 4) {
+            std::cerr << "Error: bounds too small !" << std::endl;
+        }
+        return x < 20 && x > WID - radius - 20 && y < WID / 4 && y > HEI - radius - 20;
+    }
+    void init_m_Boombs() {
+        m_bombs.clear();
+        for (int i = 0; i < 5; ++i) {
+            m_bomb.setXY(0.56 * WID + BOMB_W * i, MINER_Y + MINER_H - BOMB_H);
+            m_bombs.push_back(m_bomb);
         }
     }
     void callbackQuit() {
@@ -1166,18 +1225,18 @@ private:
         loadimage(&img_goldminer_2, imgPath_goldminer_2.c_str(), MINER_W, MINER_H, true);        
         loadimage(&mask_goldminer_2, maskPath_goldminer_2.c_str(), MINER_W, MINER_H, true);
         loadimage(&img_brick, imgPath_brick.c_str(), WID, 10, true);
-        loadimage(&img_gold_big, imgPath_gold_big.c_str(), 150, 150, true);
-        loadimage(&mask_gold_big, maskPath_gold_big.c_str(), 150, 150, true);
-        loadimage(&img_gold_mid, imgPath_gold_mid.c_str(), 100, 100, true);
-        loadimage(&mask_gold_mid, maskPath_gold_mid.c_str(), 100, 100, true);
-        loadimage(&img_gold_small, imgPath_gold_small.c_str(), 50, 50, true);
-        loadimage(&mask_gold_small, maskPath_gold_small.c_str(), 50, 50, true);
-        loadimage(&img_rock_mid, imgPath_rock_mid.c_str(), 100, 100, true);
-        loadimage(&mask_rock_mid, maskPath_rock_mid.c_str(), 100, 100, true);
-        loadimage(&img_rock_small, imgPath_rock_small.c_str(), 50, 50, true);
-        loadimage(&mask_rock_small, maskPath_rock_small.c_str(), 50, 50, true);
-        loadimage(&img_diamond, imgPath_diamond.c_str(), 40, 40, true);
-        loadimage(&mask_diamond, maskPath_diamond.c_str(), 40, 40, true);
+        loadimage(&img_gold_big, imgPath_gold_big.c_str(), 2 * GoldRadiusType::BIG, 2 * GoldRadiusType::BIG, true);
+        loadimage(&mask_gold_big, maskPath_gold_big.c_str(), 2 * GoldRadiusType::BIG, 2 * GoldRadiusType::BIG, true);
+        loadimage(&img_gold_mid, imgPath_gold_mid.c_str(), 2 * GoldRadiusType::MID, 2 * GoldRadiusType::MID, true);
+        loadimage(&mask_gold_mid, maskPath_gold_mid.c_str(), 2 * GoldRadiusType::MID, 2 * GoldRadiusType::MID, true);
+        loadimage(&img_gold_small, imgPath_gold_small.c_str(), 2 * GoldRadiusType::SMALL, 2 * GoldRadiusType::SMALL, true);
+        loadimage(&mask_gold_small, maskPath_gold_small.c_str(), 2 * GoldRadiusType::SMALL, 2 * GoldRadiusType::SMALL, true);
+        loadimage(&img_rock_mid, imgPath_rock_mid.c_str(), 2 * RockRadiusType::MID, 2 * RockRadiusType::MID, true);
+        loadimage(&mask_rock_mid, maskPath_rock_mid.c_str(), 2 * RockRadiusType::MID, 2 * RockRadiusType::MID, true);
+        loadimage(&img_rock_small, imgPath_rock_small.c_str(), 2 * RockRadiusType::SMALL, 2 * RockRadiusType::SMALL, true);
+        loadimage(&mask_rock_small, maskPath_rock_small.c_str(), 2 * RockRadiusType::SMALL, 2 * RockRadiusType::SMALL, true);
+        loadimage(&img_diamond, imgPath_diamond.c_str(), 2 * DiamondRadiusType::SMALL, 2 * DiamondRadiusType::SMALL, true);
+        loadimage(&mask_diamond, maskPath_diamond.c_str(), 2 * DiamondRadiusType::SMALL, 2 * DiamondRadiusType::SMALL, true);
         loadimage(&img_hook, imgPath_hook.c_str(), 35, 20, true);
         loadimage(&mask_hook, maskPath_hook.c_str(), 35, 20, true);
         loadimage(&img_bomb, imgPath_bomb.c_str(), BOMB_W, BOMB_H, true);
@@ -1212,40 +1271,40 @@ private:
         } else if (img_brick.getwidth() != WID || img_brick.getheight() != 10) {
             std::cerr << "Failed to load img_brick!" << std::endl;
             return false;
-        } else if (img_gold_big.getwidth() != 150 || img_gold_big.getheight() != 150) {
+        } else if (img_gold_big.getwidth() != 2 * GoldRadiusType::BIG || img_gold_big.getheight() != 2 * GoldRadiusType::BIG) {
             std::cerr << "Failed to load img_gold_big!" << std::endl;
             return false;
-        } else if (mask_gold_big.getwidth() != 150 || mask_gold_big.getheight() != 150) {
+        } else if (mask_gold_big.getwidth() != 2 * GoldRadiusType::BIG || mask_gold_big.getheight() != 2 * GoldRadiusType::BIG) {
             std::cerr << "Failed to load mask_gold_big!" << std::endl;
             return false;
-        } else if (img_gold_mid.getwidth() != 100 || img_gold_mid.getheight() != 100) {
+        } else if (img_gold_mid.getwidth() != 2 * GoldRadiusType::MID || img_gold_mid.getheight() != 2 * GoldRadiusType::MID) {
             std::cerr << "Failed to load img_gold_mid!" << std::endl;
             return false;
-        } else if (mask_gold_mid.getwidth() != 100 || mask_gold_mid.getheight() != 100) {
+        } else if (mask_gold_mid.getwidth() != 2 * GoldRadiusType::MID || mask_gold_mid.getheight() != 2 * GoldRadiusType::MID) {
             std::cerr << "Failed to load mask_gold_mid!" << std::endl;
             return false;
-        } else if (img_gold_small.getwidth() != 50 || img_gold_small.getheight() != 50) {
+        } else if (img_gold_small.getwidth() != 2 * GoldRadiusType::SMALL || img_gold_small.getheight() != 2 * GoldRadiusType::SMALL) {
             std::cerr << "Failed to load img_gold_small!" << std::endl;
             return false;
-        } else if (mask_gold_small.getwidth() != 50 || mask_gold_small.getheight() != 50) {
+        } else if (mask_gold_small.getwidth() != 2 * GoldRadiusType::SMALL || mask_gold_small.getheight() != 2 * GoldRadiusType::SMALL) {
             std::cerr << "Failed to load mask_gold_small!" << std::endl;
             return false;
-        } else if (img_rock_mid.getwidth() != 100 || img_rock_mid.getheight() != 100) {
+        } else if (img_rock_mid.getwidth() != 2 * RockRadiusType::MID || img_rock_mid.getheight() != 2 * RockRadiusType::MID) {
             std::cerr << "Failed to load img_rock_mid!" << std::endl;
             return false;
-        } else if (mask_rock_mid.getwidth() != 100 || mask_rock_mid.getheight() != 100) {
+        } else if (mask_rock_mid.getwidth() != 2 * RockRadiusType::MID || mask_rock_mid.getheight() != 2 * RockRadiusType::MID) {
             std::cerr << "Failed to load mask_rock_mid!" << std::endl;
             return false;
-        } else if (img_rock_small.getwidth() != 50 || img_rock_small.getheight() != 50) {
+        } else if (img_rock_small.getwidth() != 2 * RockRadiusType::SMALL || img_rock_small.getheight() != 2 * RockRadiusType::SMALL) {
             std::cerr << "Failed to load img_rock_small!" << std::endl;
             return false;
-        } else if (mask_rock_small.getwidth() != 50 || mask_rock_small.getheight() != 50) {
+        } else if (mask_rock_small.getwidth() != 2 * RockRadiusType::SMALL || mask_rock_small.getheight() != 2 * RockRadiusType::SMALL) {
             std::cerr << "Failed to load mask_rock_small!" << std::endl;
             return false;
-        } else if (img_diamond.getwidth() != 40 || img_diamond.getheight() != 40) {
+        } else if (img_diamond.getwidth() != 2 * DiamondRadiusType::SMALL || img_diamond.getheight() != 2 * DiamondRadiusType::SMALL) {
             std::cerr << "Failed to load img_diamond!" << std::endl;
             return false;
-        } else if (mask_diamond.getwidth() != 40 || mask_diamond.getheight() != 40) {
+        } else if (mask_diamond.getwidth() != 2 * DiamondRadiusType::SMALL || mask_diamond.getheight() != 2 * DiamondRadiusType::SMALL) {
             std::cerr << "Failed to load mask_diamond!" << std::endl;
             return false;
         } else if (img_hook.getwidth() != 35 || img_hook.getheight() != 20) {
