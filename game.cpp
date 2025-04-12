@@ -103,10 +103,12 @@ struct GoldRadiusType {
     static constexpr int MID = 50;
     static constexpr int SMALL = 25;
 };
+
 struct RockRadiusType {
     static constexpr int MID = 50;
     static constexpr int SMALL = 25;
 };
+
 struct DiamondRadiusType {
     static constexpr int SMALL = 20;
 };
@@ -465,26 +467,29 @@ public:
                 angle = 20;
             }
         } else {
-            if (!isRetracting) {
-                length += speed;
-                if (endX <= 0 || endX >= WID || endY >= HEI) {
-                    isRetracting = true;
-                }
-            } else {
+            if (isRetracting) {
                 length -= speed;
                 if (length <= HOOK_LENGTH) {
                     length = HOOK_LENGTH;
                     setSpeed(HOOK_SPEED);
                     stop();
                 }
+            } else {
+                length += speed;
+                if (endX <= 0 || endX >= WID || endY >= HEI) {
+                    isRetracting = true;
+                }
             }
         }
     }
+    bool isGoingOut() {
+        return length > HOOK_LENGTH && isMoving;
+    }
+    bool isGoingBack() {
+        return length > HOOK_LENGTH && isMoving && isRetracting;
+    }
     bool isStop() {
         return (!isMoving) && (!isRetracting) && (length <= HOOK_LENGTH);
-    }
-    bool isRetract() {
-        return isRetracting;
     }
     void setSpeed(int speed) {
         this->speed = speed;
@@ -542,8 +547,7 @@ public:
 
 class GameObject : public CObject {
 protected:
-    double x;
-    double y;
+    double x, y;
     int radius;
     int speed;
     int score;
@@ -848,6 +852,7 @@ private:
     CButton m_button_quit;
     bool gaming = false;
     bool isSpecialLevel = false;
+    GameObject m_focusedGameObject;
 public:
     CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), m_clock(), m_score(), m_stage(), m_miner(), m_hook(), m_bomb(),
         m_button_quit(0.65 * WID, (MINER_Y + MINER_H - 0.08 * HEI) / 2, 0.12 * WID, 0.08 * HEI, "Quit", std::bind(&CGame::callbackQuit, this)) {}
@@ -905,12 +910,14 @@ private:
             if (m.uMsg == WM_LBUTTONDOWN) {
                 m_hook.move();
                 m_miner.work();
-            } else if (m.uMsg == WM_RBUTTONDOWN && m_hook.isRetract() && m_bombs.size() > 0) {
-                m_bombs[m_bombs.size() - 1].blow();
-                m_hook.setSpeed(HOOK_SPEED);
-                for (auto it = m_gameObjects.begin(); it != m_gameObjects.end(); ++it) {
-                    if ((*it)->retracted()) {
-                        (*it)->bomb();
+            } else if (m.uMsg == WM_RBUTTONDOWN) {
+                if (m_hook.isGoingBack() && m_bombs.size() > 0) {
+                    m_bombs[m_bombs.size() - 1].blow();
+                    m_hook.setSpeed(HOOK_SPEED);
+                    for (auto it = m_gameObjects.begin(); it != m_gameObjects.end(); ++it) {
+                        if ((*it)->retracted()) {
+                            (*it)->bomb();
+                        }
                     }
                 }
             }
@@ -935,7 +942,6 @@ private:
             m_clock.update();
             m_hook.update();
             m_miner.update();
-            m_button_quit.draw();
             if (m_hook.isStop()) {
                 m_miner.stop();
             }
@@ -955,7 +961,7 @@ private:
                         break;
                     }
                     (*it)->move(m_hook.getAngle());
-                }else if ((*it)->isHooked(m_hook.getEndX(), m_hook.getEndY())) {
+                } else if ((*it)->isHooked(m_hook.getEndX(), m_hook.getEndY())) {
                     m_miner.useEnergy();
                     m_hook.setSpeed((*it)->getSpeed());
                     m_hook.retract();
@@ -978,7 +984,7 @@ private:
         int num_gold = 0;
         int num_rock = 0;
         int num_diamond = 0;
-        if (isSpecialLevel) {} else {
+        if (!isSpecialLevel) {
             num_diamond = num_index + rand() % 2;
             num_gold = 3 + 8 * num_index + rand() % 3;
             num_rock = 3 + 3 * num_index + rand() % 2;
@@ -1019,19 +1025,21 @@ private:
         }
     }
     bool isTooClose(int x, int y, int radius) {
-        for (auto it = m_gameObjects.begin(); it != m_gameObjects.end(); ++it) {
-            if (abs((*it)->getRx() - x) < (*it)->getRadius() + radius + 0.1 * LENGTH_INDEX || 
-                abs((*it)->getRy() - y) < (*it)->getRadius() + radius + 0.1 * LENGTH_INDEX) {
-                return true;
+        if (!m_gameObjects.empty()) {
+            for (auto it = m_gameObjects.begin(); it != m_gameObjects.end(); ++it) {
+                if (std::pow(((*it)->getRx() - (x + radius)), 2) + std::pow(((*it)->getRy() - (y + radius)), 2)
+                  < std::pow((*it)->getRadius() + radius + 0.1 * LENGTH_INDEX), 2) {
+                    return true;
+                }
             }
         }
-        return true;
+        return false;
     }
     bool outOfBounds(int x, int y, int radius) {
         if (WID - radius - 20 <= 20 || HEI - radius - 20 <= WID / 4) {
             std::cerr << "Error: bounds too small !" << std::endl;
         }
-        return x < 20 && x > WID - radius - 20 && y < WID / 4 && y > HEI - radius - 20;
+        return x < 20 || x > WID - radius - 20 || y < HEI / 4 || y > HEI - radius - 20;
     }
     void init_m_Boombs() {
         m_bombs.clear();
@@ -1130,7 +1138,7 @@ private:
     CWin m_win;
     CLose m_lose;
 public:
-    Game(): m_game_scene(GameSceneType::MENU),
+    Game(): m_game_scene(GameSceneType::GAME),
             m_menu([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_signin([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_login([this](GameSceneType scene) { this->m_game_scene = scene; }),
