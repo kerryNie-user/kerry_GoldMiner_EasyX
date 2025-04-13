@@ -556,7 +556,11 @@ protected:
     IMAGE img;
     IMAGE mask;
 public:
-    GameObject(double x, double y, const int radiusType, IMAGE& img, IMAGE& mask) : x(x), y(y), radius(radiusType), img(img), mask(mask) {}
+    GameObject(double x, double y, const int radiusType, IMAGE& img, IMAGE& mask)
+         : x(x), y(y), radius(radiusType), img(img), mask(mask) {}
+    GameObject(const GameObject& other)
+        : x(other.x), y(other.y), radius(other.radius), speed(other.speed), score(other.score), 
+        isBombed(other.isBombed), isRetracting(other.isRetracting), img(other.img), mask(other.mask) {}
     void draw() {
         putimgwithmask(img, mask, x, y);
     }
@@ -573,6 +577,20 @@ public:
     void move(int moveangle) {
         x -= speed * cos(degreesToRadians(moveangle));
         y -= speed * sin(degreesToRadians(moveangle));
+    }
+    GameObject& operator=(const GameObject& other) {
+        if (this != &other) {
+            x = other.x;
+            y = other.y;
+            radius = other.radius;
+            speed = other.speed;
+            score = other.score;
+            isBombed = other.isBombed;
+            isRetracting = other.isRetracting;
+            img = other.img;
+            mask = other.mask;
+        }
+        return *this;
     }
     bool operator==(const GameObject& other) const {
         return this->x == other.x && this->y == other.y && this->radius == other.radius;
@@ -852,7 +870,7 @@ private:
     CButton m_button_quit;
     bool gaming = false;
     bool isSpecialLevel = false;
-    GameObject m_focusedGameObject;
+    GameObject m_focusedGameObject{0, 0, GoldRadiusType::SMALL, img_gold_small, mask_gold_small};
 public:
     CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), m_clock(), m_score(), m_stage(), m_miner(), m_hook(), m_bomb(),
         m_button_quit(0.65 * WID, (MINER_Y + MINER_H - 0.08 * HEI) / 2, 0.12 * WID, 0.08 * HEI, "Quit", std::bind(&CGame::callbackQuit, this)) {}
@@ -1028,7 +1046,7 @@ private:
         if (!m_gameObjects.empty()) {
             for (auto it = m_gameObjects.begin(); it != m_gameObjects.end(); ++it) {
                 if (std::pow(((*it)->getRx() - (x + radius)), 2) + std::pow(((*it)->getRy() - (y + radius)), 2)
-                  < std::pow((*it)->getRadius() + radius + 0.1 * LENGTH_INDEX), 2) {
+                 < std::pow(((*it)->getRadius() + radius + 0.1 * LENGTH_INDEX), 2)) {
                     return true;
                 }
             }
