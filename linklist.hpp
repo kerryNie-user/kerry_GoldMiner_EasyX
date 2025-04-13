@@ -57,12 +57,6 @@ public:
         }
     }
 
-    LinkedList(LinkedList&& other) noexcept : head(other.head), tail(other.tail), size_(other.size_) {
-        other.head = nullptr;
-        other.tail = nullptr;
-        other.size_ = 0;
-    }
-
     LinkedList& operator=(const LinkedList& other) {
         if (this != &other) {
             clear();
@@ -73,34 +67,18 @@ public:
         return *this;
     }
 
-    LinkedList& operator=(LinkedList&& other) noexcept {
-        if (this != &other) {
-            clear();
-            head = other.head;
-            tail = other.tail;
-            size_ = other.size_;
-            other.head = nullptr;
-            other.tail = nullptr;
-            other.size_ = 0;
+    T& operator[](int index) {
+        if (index < 0 || index >= size_) {
+            throw std::out_of_range("Index out of range for operator[]");
         }
-        return *this;
-    }
-
-    ~LinkedList() {
-        clear();
-    }
-
-    void push_back(T&& value) {
-        Node<T>* newNode = new Node<T>(std::move(value));
-        if (head == nullptr) {
-            head = newNode;
-            tail = newNode;
-        } else {
-            tail->next = newNode;
-            tail = newNode;
+        Node<T>* current = head;
+        for (int i = 0; i < index; ++i) {
+            current = current->next;
         }
-        ++size_;
+        return current->data;
     }
+    
+    ~LinkedList() { clear(); }
 
     void push_back(const T& value) {
         Node<T>* newNode = new Node<T>(value);
@@ -114,24 +92,9 @@ public:
         ++size_;
     }
 
-    T& operator[](int index) {
-        if (index < 0 || index >= size_) {
-            throw std::out_of_range("Index out of range for operator[]");
-        }
-        Node<T>* current = head;
-        for (int i = 0; i < index; ++i) {
-            current = current->next;
-        }
-        return current->data;
-    }
+    int size() const { return size_; }
 
-    int size() const {
-        return size_;
-    }
-
-    bool empty() const {
-        return size_ == 0;
-    }
+    bool empty() const { return size_ == 0; }
 
     void clear() {
         while (head != nullptr) {
@@ -143,56 +106,38 @@ public:
         size_ = 0;
     }
 
-    void removeAt(int index) {
-        if (index < 0 || index >= size_) {
-            throw std::out_of_range("Index out of range for removeAt");
+    void erase(const T& t) {
+        if (head == nullptr) {
+            return;
         }
-        if (index == 0) {
+    
+        if (head->data == t) {
             Node<T>* temp = head;
             head = head->next;
             if (head == nullptr) {
                 tail = nullptr;
             }
             delete temp;
-        } else {
-            Node<T>* prev = head;
-            for (int i = 0; i < index - 1; ++i) {
-                prev = prev->next;
-            }
-            Node<T>* current = prev->next;
-            prev->next = current->next;
-            if (current == tail) {
-                tail = prev;
-            }
-            delete current;
+            --size_;
+            return;
         }
-        --size_;
-    }
-
-    LinkedListIterator<T> erase(LinkedListIterator<T> it) {
-        if (it == end()) {
-            return it;
+    
+        Node<T>* prev = head;
+        Node<T>* current = head->next;
+    
+        while (current != nullptr) {
+            if (current->data == t) {
+                prev->next = current->next;
+                if (current == tail) {
+                    tail = prev;
+                }
+                delete current;
+                --size_;
+                return;
+            }
+            prev = current;
+            current = current->next;
         }
-        Node<T>* current = it.current;
-        if (current == head) {
-            head = current->next;
-            if (head == nullptr) {
-                tail = nullptr;
-            }
-        } else {
-            Node<T>* prev = head;
-            while (prev->next != current) {
-                prev = prev->next;
-            }
-            prev->next = current->next;
-            if (current == tail) {
-                tail = prev;
-            }
-        }
-        auto nextIt = LinkedListIterator<T>(current->next);
-        delete current;
-        --size_;
-        return nextIt;
     }
 
     LinkedListIterator<T> begin() {

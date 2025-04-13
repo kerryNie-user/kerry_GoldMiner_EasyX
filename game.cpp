@@ -526,6 +526,9 @@ private:
     IMAGE maskB;
 public:
     CBomb() : blowUp(false) {}
+    bool operator==(const CBomb& other) const {
+        return this->x == other.x && this->y == other.y;
+    }
     void init(IMAGE& imgB, IMAGE& maskB) {
         this->imgB = imgB;
         this->maskB = maskB;
@@ -537,12 +540,8 @@ public:
     void draw() override {
         putimgwithmask(imgB, maskB, x, y);
     }
-    void blow() {
-        blowUp = true;
-    }
-    bool blowed() {
-        return blowUp;
-    }
+    void blow() { blowUp = true; }
+    bool blowed() { return blowUp; }
 };
 
 class GameObject : public CObject {
@@ -556,28 +555,12 @@ protected:
     IMAGE img;
     IMAGE mask;
 public:
+    GameObject() {}
     GameObject(double x, double y, const int radiusType, IMAGE& img, IMAGE& mask)
          : x(x), y(y), radius(radiusType), img(img), mask(mask) {}
     GameObject(const GameObject& other)
         : x(other.x), y(other.y), radius(other.radius), speed(other.speed), score(other.score), 
         isBombed(other.isBombed), isRetracting(other.isRetracting), img(other.img), mask(other.mask) {}
-    void draw() {
-        putimgwithmask(img, mask, x, y);
-    }
-    void retract() {
-        isRetracting = true;
-    }
-    bool retracted() {
-        return isRetracting;
-    }
-    bool isHooked(int hookX, int hookY) {
-        int distanceSquared = std::pow((x + radius - hookX), 2) + std::pow((y + radius - hookY), 2);
-        return distanceSquared - radius * radius <= 35;
-    }
-    void move(int moveangle) {
-        x -= speed * cos(degreesToRadians(moveangle));
-        y -= speed * sin(degreesToRadians(moveangle));
-    }
     GameObject& operator=(const GameObject& other) {
         if (this != &other) {
             x = other.x;
@@ -594,6 +577,16 @@ public:
     }
     bool operator==(const GameObject& other) const {
         return this->x == other.x && this->y == other.y && this->radius == other.radius;
+    }
+    void draw() {
+        putimgwithmask(img, mask, x, y);
+    }
+    void retract() { isRetracting = true; }
+    bool retracted() { return isRetracting; }
+    bool isHooked(int hookX, int hookY) { return std::pow((x + radius - hookX), 2) + std::pow((y + radius - hookY), 2) - radius * radius <= 35; }
+    void move(int moveangle) {
+        x -= speed * cos(degreesToRadians(moveangle));
+        y -= speed * sin(degreesToRadians(moveangle));
     }
     int getScore() const { return score; }
     int getSpeed() const { return speed; }
@@ -639,21 +632,21 @@ public:
 
 class GameObjectFactory {
 public:
-    static std::unique_ptr<GameObject> createGameObject(GameObjectType type, int x, int y, int radiusType, IMAGE& img, IMAGE& mask) {
+    static GameObject createGameObject(GameObjectType type, int x, int y, int radiusType, IMAGE& img, IMAGE& mask) {
         switch (type) {
             case GameObjectType::GOLD:
-                return std::make_unique<Gold>(x, y, radiusType, img, mask);
+                return Gold(x, y, radiusType, img, mask);
             case GameObjectType::ROCK:
-                return std::make_unique<Rock>(x, y, radiusType, img, mask);
+                return Rock(x, y, radiusType, img, mask);
             case GameObjectType::DIAMOND:
-                return std::make_unique<Diamond>(x, y, radiusType, img, mask);
+                return Diamond(x, y, radiusType, img, mask);
             default:
-                return nullptr;
+                throw std::invalid_argument("Invalid GameObjectType");
         }
     }
 };
 
-LinkedList<std::unique_ptr<GameObject>> m_gameObjects;
+LinkedList<GameObject> m_gameObjects;
 LinkedList<CBomb> m_bombs;
 
 class CScene {
@@ -904,23 +897,13 @@ public:
         m_miner.draw();
         m_hook.draw();
         m_button_quit.draw();
-        for (auto bomb : m_bombs) {
-            bomb.draw();
-        }
-        for (const auto& obj : m_gameObjects) {
-            obj->draw();
-        }
+        for (CBomb& bomb : m_bombs) { bomb.draw(); }
+        for (GameObject& obj : m_gameObjects) { obj.draw(); }
         FlushBatchDraw();
     }
-    bool gameStarted() const {
-        return gaming;
-    }
-    void start() {
-        gaming = true;
-    }
-    void over() {
-        gaming = false;
-    }
+    bool gameStarted() const { return gaming; }
+    void start() { gaming = true; }
+    void over() { gaming = false; }
 private:
     void updateWithInput() {
         if (MouseHit()) {
@@ -932,9 +915,9 @@ private:
                 if (m_hook.isGoingBack() && m_bombs.size() > 0) {
                     m_bombs[m_bombs.size() - 1].blow();
                     m_hook.setSpeed(HOOK_SPEED);
-                    for (auto it = m_gameObjects.begin(); it != m_gameObjects.end(); ++it) {
-                        if ((*it)->retracted()) {
-                            (*it)->bomb();
+                    for (GameObject& obj : m_gameObjects) {
+                        if (obj.retracted()) {
+                            obj.bomb();
                         }
                     }
                 }
@@ -964,26 +947,26 @@ private:
                 m_miner.stop();
             }
             if (m_bombs[m_bombs.size() - 1].blowed()) {
-                m_bombs.removeAt(m_bombs.size() - 1);
+                m_bombs.erase(m_bombs[m_bombs.size() - 1]);
             }
-            for (auto it = m_gameObjects.begin(); it != m_gameObjects.end(); ++it) {
-                if ((*it)->bombed()) {
-                    it = m_gameObjects.erase(it);
+            for (GameObject& obj : m_gameObjects) {
+                if (obj.bombed()) {
+                    m_gameObjects.erase(obj);
                     break;
                 }
-                if ((*it)->retracted()) {
+                if (obj.retracted()) {
                     if (m_hook.isStop()) {
-                        m_score.get((*it)->getScore());
-                        it = m_gameObjects.erase(it);
+                        m_score.get(obj.getScore());
+                        m_gameObjects.erase(obj);
                         m_miner.stop();
                         break;
                     }
-                    (*it)->move(m_hook.getAngle());
-                } else if ((*it)->isHooked(m_hook.getEndX(), m_hook.getEndY())) {
+                    obj.move(m_hook.getAngle());
+                } else if (obj.isHooked(m_hook.getEndX(), m_hook.getEndY())) {
                     m_miner.useEnergy();
-                    m_hook.setSpeed((*it)->getSpeed());
+                    m_hook.setSpeed(obj.getSpeed());
                     m_hook.retract();
-                    (*it)->retract();
+                    obj.retract();
                 }
             }
         }
@@ -1032,21 +1015,20 @@ private:
     }
     void initOneTypeOfGameObjects(int num, GameObjectType type, int radius, IMAGE& img, IMAGE& mask) {
         int x, y;
-        std::unique_ptr<GameObject> obj;
+        GameObject obj;
         for (int i = 0; i < num; ++i) {
             do {
                 x = rand() % (WID - img.getwidth());
                 y = rand() % (HEI - img.getheight());
             } while (outOfBounds(x, y, radius) || isTooClose(x, y, radius));
             obj = GameObjectFactory::createGameObject(type, x, y, radius, img, mask);
-            m_gameObjects.push_back(std::move(obj));
+            m_gameObjects.push_back(obj);
         }
     }
     bool isTooClose(int x, int y, int radius) {
         if (!m_gameObjects.empty()) {
-            for (auto it = m_gameObjects.begin(); it != m_gameObjects.end(); ++it) {
-                if (std::pow(((*it)->getRx() - (x + radius)), 2) + std::pow(((*it)->getRy() - (y + radius)), 2)
-                 < std::pow(((*it)->getRadius() + radius + 0.1 * LENGTH_INDEX), 2)) {
+            for (GameObject& obj : m_gameObjects) {
+                if (std::pow((obj.getRx() - (x + radius)), 2) + std::pow((obj.getRy() - (y + radius)), 2) < std::pow((obj.getRadius() + radius + 0.1 * LENGTH_INDEX), 2)) {
                     return true;
                 }
             }
