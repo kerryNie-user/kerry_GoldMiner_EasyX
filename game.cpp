@@ -16,6 +16,8 @@
 #include <iomanip>
 #include "linklist.hpp"
 
+#pragma comment(lib, "Winmm.lib")
+
 LinkedList<std::string> storedUsername;
 LinkedList<std::string> storedPassword;
 LinkedList<int> storedStage;
