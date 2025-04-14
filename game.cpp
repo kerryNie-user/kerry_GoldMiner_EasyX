@@ -578,6 +578,9 @@ public:
     bool operator==(const GameObject& other) const {
         return this->x == other.x && this->y == other.y && this->radius == other.radius;
     }
+    bool operator!=(const GameObject& other) const {
+        return !operator==(other);
+    }
     void draw() {
         putimgwithmask(img, mask, x, y);
     }
@@ -851,6 +854,8 @@ private:
 };
 
 int goal = 0;
+IMAGE img_null;
+GameObject nullObject(0, 0, GoldRadiusType::BIG, img_null, img_null);
 
 class CGame : public CScene {
 private:
@@ -863,7 +868,7 @@ private:
     CButton m_button_quit;
     bool gaming = false;
     bool isSpecialLevel = false;
-    GameObject m_focusedGameObject{0, 0, GoldRadiusType::SMALL, img_gold_small, mask_gold_small};
+    GameObject* m_focusedGameObject = &nullObject;
 public:
     CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), m_clock(), m_score(), m_stage(), m_miner(), m_hook(), m_bomb(),
         m_button_quit(0.65 * WID, (MINER_Y + MINER_H - 0.08 * HEI) / 2, 0.12 * WID, 0.08 * HEI, "Quit", std::bind(&CGame::callbackQuit, this)) {}
@@ -898,6 +903,7 @@ public:
         m_hook.draw();
         m_button_quit.draw();
         for (CBomb& bomb : m_bombs) { bomb.draw(); }
+        m_focusedGameObject->draw();
         for (GameObject& obj : m_gameObjects) { obj.draw(); }
         FlushBatchDraw();
     }
@@ -915,11 +921,14 @@ private:
                 if (m_hook.isGoingBack() && m_bombs.size() > 0) {
                     m_bombs[m_bombs.size() - 1].blow();
                     m_hook.setSpeed(HOOK_SPEED);
-                    for (GameObject& obj : m_gameObjects) {
-                        if (obj.retracted()) {
-                            obj.bomb();
-                        }
+                    if (m_focusedGameObject != &nullObject) {
+                        m_focusedGameObject->bomb();
                     }
+                    // for (GameObject& obj : m_gameObjects) {
+                    //     if (obj.retracted()) {
+                    //         obj.bomb();
+                    //     }
+                    // }
                 }
             }
             m_button_quit.simulateMouseMSG(m);
@@ -946,29 +955,54 @@ private:
             if (m_hook.isStop()) {
                 m_miner.stop();
             }
+            if (m_hook.isGoingOut() && m_focusedGameObject == &nullObject) {
+                for (GameObject& obj : m_gameObjects) {
+                    if (obj.isHooked(m_hook.getEndX(), m_hook.getEndY())) {
+                        m_miner.useEnergy();
+                        m_hook.setSpeed(obj.getSpeed());
+                        m_hook.retract();
+                        obj.retract();
+                        m_focusedGameObject = &obj;
+                    }
+                }
+            } else if (m_focusedGameObject != &nullObject) {
+                if (m_focusedGameObject->bombed()) {
+                    m_gameObjects.erase(*m_focusedGameObject);
+                    m_focusedGameObject = &nullObject;
+                }
+                if (m_focusedGameObject->retracted()) {
+                    if (m_hook.isStop()) {
+                        m_score.get(m_focusedGameObject->getScore());
+                        m_gameObjects.erase(*m_focusedGameObject);
+                        m_focusedGameObject = &nullObject;
+                        m_miner.stop();
+                    }
+                    m_focusedGameObject->move(m_hook.getAngle());
+                }
+            }
             if (m_bombs[m_bombs.size() - 1].blowed()) {
                 m_bombs.erase(m_bombs[m_bombs.size() - 1]);
             }
-            for (GameObject& obj : m_gameObjects) {
-                if (obj.bombed()) {
-                    m_gameObjects.erase(obj);
-                    break;
-                }
-                if (obj.retracted()) {
-                    if (m_hook.isStop()) {
-                        m_score.get(obj.getScore());
-                        m_gameObjects.erase(obj);
-                        m_miner.stop();
-                        break;
-                    }
-                    obj.move(m_hook.getAngle());
-                } else if (obj.isHooked(m_hook.getEndX(), m_hook.getEndY())) {
-                    m_miner.useEnergy();
-                    m_hook.setSpeed(obj.getSpeed());
-                    m_hook.retract();
-                    obj.retract();
-                }
-            }
+            // for (GameObject& obj : m_gameObjects) {
+            //     if (obj.bombed()) {
+            //         m_gameObjects.erase(obj);
+            //         break;
+            //     }
+            //     if (obj.retracted()) {
+            //         if (m_hook.isStop()) {
+            //             m_score.get(obj.getScore());
+            //             m_gameObjects.erase(obj);
+            //             m_miner.stop();
+            //             break;
+            //         }
+            //         obj.move(m_hook.getAngle());
+            //     } else if (obj.isHooked(m_hook.getEndX(), m_hook.getEndY())) {
+            //         m_miner.useEnergy();
+            //         m_hook.setSpeed(obj.getSpeed());
+            //         m_hook.retract();
+            //         obj.retract();
+            //     }
+            // }
         }
     }
     void init_m_GameObjects() {
