@@ -20,7 +20,8 @@
                 "-limm32",
                 "-lole32",
                 "-loleaut32",
-                "-lmsimg32"
+                "-lmsimg32",
+                "-lwinmm"
             ],
             "options": {
                 "cwd": "${fileDirname}"

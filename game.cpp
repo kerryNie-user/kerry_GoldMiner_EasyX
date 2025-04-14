@@ -55,6 +55,14 @@ std::string imgPath_explosive = "res/img_explosive.jpg";
 std::string maskPath_explosive = "res/img_explosive.jpg";
 std::string imgPath_game_end = "res/img_game_end.png";
 
+std::string musicPath_background = "res/music_background.mp3";
+std::string musicPath_bomb_explosive = "res/music_bomb_explosive.mp3";
+std::string musicPath_hook_goingOut = "res/music_hook_goingOut.mp3";
+std::string musicPath_hook_treasure = "res/music_hook_treasure.mp3";
+std::string musicPath_hook_gold = "res/music_hook_gold.mp3";
+std::string musicPath_hook_rock = "res/music_hook_rock.mp3";
+std::string musicPath_transition = "res/music_transition.mp3";
+
 IMAGE img_startup;
 IMAGE img_signin;
 IMAGE img_login;
@@ -111,8 +119,10 @@ struct RockRadiusType {
     static constexpr int SMALL = 25;
 };
 
-struct DiamondRadiusType {
-    static constexpr int SMALL = 20;
+struct TreasureRadiusType {
+    static constexpr int DIAMOND = 20;
+    static constexpr int MONEY = 30;
+    static constexpr int MONEYBAG = 25;
 };
 
 #define degreesToRadians(angleDegrees) ((angleDegrees) * M_PI / 180.0)
@@ -130,7 +140,7 @@ enum class GameSceneType {
 enum class GameObjectType {
     GOLD,
     ROCK,
-    DIAMOND
+    TREASURE
 };
 
 class Clock {
@@ -548,6 +558,7 @@ public:
 
 class GameObject : public CObject {
 protected:
+    GameObjectType type;
     double x, y;
     int radius;
     int speed;
@@ -558,13 +569,14 @@ protected:
     IMAGE mask;
 public:
     GameObject() {}
-    GameObject(double x, double y, const int radiusType, IMAGE& img, IMAGE& mask)
-         : x(x), y(y), radius(radiusType), img(img), mask(mask) {}
+    GameObject(GameObjectType type, double x, double y, const int radiusType, IMAGE& img, IMAGE& mask)
+         : type(type), x(x), y(y), radius(radiusType), img(img), mask(mask) {}
     GameObject(const GameObject& other)
-        : x(other.x), y(other.y), radius(other.radius), speed(other.speed), score(other.score), 
+        : type(other.type), x(other.x), y(other.y), radius(other.radius), speed(other.speed), score(other.score), 
         isBombed(other.isBombed), isRetracting(other.isRetracting), img(other.img), mask(other.mask) {}
     GameObject& operator=(const GameObject& other) {
         if (this != &other) {
+            type = other.type;
             x = other.x;
             y = other.y;
             radius = other.radius;
@@ -578,7 +590,7 @@ public:
         return *this;
     }
     bool operator==(const GameObject& other) const {
-        return this->x == other.x && this->y == other.y && this->radius == other.radius;
+        return this->type == other.type && this->x == other.x && this->y == other.y && this->radius == other.radius;
     }
     bool operator!=(const GameObject& other) const {
         return !operator==(other);
@@ -586,6 +598,7 @@ public:
     void draw() {
         putimgwithmask(img, mask, x, y);
     }
+    GameObjectType getType() const { return type; }
     void retract() { isRetracting = true; }
     bool retracted() { return isRetracting; }
     bool isHooked(int hookX, int hookY) { return std::pow((x + radius - hookX), 2) + std::pow((y + radius - hookY), 2) - radius * radius <= 35; }
@@ -604,8 +617,11 @@ public:
 
 class Gold : public GameObject {
 public:
-    Gold(int x, int y, int radiusType, IMAGE& img, IMAGE& mask) : GameObject(x, y, radiusType, img, mask) {
-        int index = (radiusType == GoldRadiusType::BIG) ? 3 : (radiusType == GoldRadiusType::MID) ? 2 : (radiusType == GoldRadiusType::SMALL) ? 1 : 0;
+    Gold(int x, int y, int radiusType, IMAGE& img, IMAGE& mask) : GameObject(GameObjectType::GOLD, x, y, radiusType, img, mask) {
+        int index = (radiusType == GoldRadiusType::BIG) ? 3 
+                  : (radiusType == GoldRadiusType::MID) ? 2 
+                  : (radiusType == GoldRadiusType::SMALL) ? 1 
+                  : 0;
         static const int speeds[] = {0, 4, 2, 1};
         static const int scores[] = {0, 100, 300, 500};
         this->radius = radius;
@@ -616,8 +632,10 @@ public:
 
 class Rock : public GameObject {
 public:
-    Rock(int x, int y, int radiusType, IMAGE& img, IMAGE& mask) : GameObject(x, y, radiusType, img, mask) {
-        int index = (radiusType == GoldRadiusType::MID) ? 2 : (radiusType == GoldRadiusType::SMALL) ? 1 : 0;
+    Rock(int x, int y, int radiusType, IMAGE& img, IMAGE& mask) : GameObject(GameObjectType::ROCK, x, y, radiusType, img, mask) {
+        int index = (radiusType == GoldRadiusType::MID) ? 2 
+                  : (radiusType == GoldRadiusType::SMALL) ? 1 
+                  : 0;
         static const int speeds[] = {0, 3, 1};
         static const int scores[] = {0, 50, 100};
         this->radius = radius;
@@ -626,12 +644,17 @@ public:
     }
 };
 
-class Diamond : public GameObject {
+class Treasure : public GameObject {
 public:
-    Diamond(int x, int y, int radiusType, IMAGE& img, IMAGE& mask) : GameObject(x, y, radiusType, img, mask) {
-        this->radius = DiamondRadiusType::SMALL;
+    Treasure(int x, int y, int radiusType, IMAGE& img, IMAGE& mask) : GameObject(GameObjectType::TREASURE, x, y, radiusType, img, mask) {
+        int index = (radiusType == TreasureRadiusType::DIAMOND) ? 3 
+                  : (radiusType == TreasureRadiusType::MONEY) ? 2 
+                  : (radiusType == TreasureRadiusType::MONEYBAG) ? 1 
+                  : 0;
+        static const int scores[] = {0, 600, 800, 1000};
+        this->radius = radiusType;
         this->speed = 4;
-        this->score = 1000;
+        this->score = scores[index];
     }
 };
 
@@ -643,8 +666,8 @@ public:
                 return Gold(x, y, radiusType, img, mask);
             case GameObjectType::ROCK:
                 return Rock(x, y, radiusType, img, mask);
-            case GameObjectType::DIAMOND:
-                return Diamond(x, y, radiusType, img, mask);
+            case GameObjectType::TREASURE:
+                return Treasure(x, y, radiusType, img, mask);
             default:
                 throw std::invalid_argument("Invalid GameObjectType");
         }
@@ -674,6 +697,16 @@ protected:
         outtextxy(textX, textY, _T(text).c_str());
         FlushBatchDraw();
         Sleep(1000);
+    }
+    void playBackgroundMusic(std::string& music) {
+        mciSendString("close bkmusic", NULL, 0, NULL);
+        mciSendString(("open " + music + " alias bkmusic").c_str(), NULL, 0, NULL);
+        mciSendString("play bkmusic repeat", NULL, 0, NULL);
+    }
+    void playSpecialEffectMusic(std::string& music) {
+        mciSendString("close specialEffect", NULL, 0, NULL);
+        mciSendString(("open " + music + " alias specialEffect").c_str(), NULL, 0, NULL);
+        mciSendString("play specialEffect", NULL, 0, NULL);
     }
 };
 
@@ -857,7 +890,7 @@ private:
 
 int goal = 0;
 IMAGE img_null;
-GameObject nullObject(0, 0, GoldRadiusType::BIG, img_null, img_null);
+GameObject nullObject(GameObjectType::GOLD, 0, 0, GoldRadiusType::BIG, img_null, img_null);
 
 class CGame : public CScene {
 private:
@@ -885,19 +918,20 @@ public:
         m_bomb.init(img_bomb, mask_bomb);
         init_m_GameObjects();
         init_m_Boombs();
+        playBackgroundMusic(musicPath_background);
     }
     void update() override {
         updateWithInput();
         updateWithoutInput();
     }
     void render() override {
-        setbkcolor(WHITE);
         cleardevice();
-        putimage(0, MINER_Y + MINER_H + 10, &img_game_background);
-        putimage(0, MINER_Y + MINER_H, &img_brick);
+        setbkcolor(WHITE);
         setbkmode(TRANSPARENT);
         settextstyle(40, 0, _T("宋体"));
         settextcolor(BLACK);
+        putimage(0, MINER_Y + MINER_H + 10, &img_game_background);
+        putimage(0, MINER_Y + MINER_H, &img_brick);
         m_clock.draw();
         m_score.draw();
         m_stage.draw();
@@ -905,8 +939,8 @@ public:
         m_hook.draw();
         m_button_quit.draw();
         for (CBomb& bomb : m_bombs) { bomb.draw(); }
-        m_focusedGameObject->draw();
         for (GameObject& obj : m_gameObjects) { obj.draw(); }
+        if (m_focusedGameObject != &nullObject) { m_focusedGameObject->draw(); }
         FlushBatchDraw();
     }
     bool gameStarted() const { return gaming; }
@@ -919,18 +953,14 @@ private:
             if (m.uMsg == WM_LBUTTONDOWN) {
                 m_hook.move();
                 m_miner.work();
+                playSpecialEffectMusic(musicPath_hook_goingOut);
             } else if (m.uMsg == WM_RBUTTONDOWN) {
                 if (m_hook.isGoingBack() && m_bombs.size() > 0) {
-                    m_bombs[m_bombs.size() - 1].blow();
                     m_hook.setSpeed(HOOK_SPEED);
                     if (m_focusedGameObject != &nullObject) {
                         m_focusedGameObject->bomb();
+                        playSpecialEffectMusic(musicPath_bomb_explosive);
                     }
-                    // for (GameObject& obj : m_gameObjects) {
-                    //     if (obj.retracted()) {
-                    //         obj.bomb();
-                    //     }
-                    // }
                 }
             }
             m_button_quit.simulateMouseMSG(m);
@@ -969,12 +999,13 @@ private:
                 }
             } else if (m_focusedGameObject != &nullObject) {
                 if (m_focusedGameObject->bombed()) {
+                    m_bombs.erase(m_bombs[m_bombs.size() - 1]);
                     m_gameObjects.erase(*m_focusedGameObject);
                     m_focusedGameObject = &nullObject;
-                }
-                if (m_focusedGameObject->retracted()) {
+                } else if (m_focusedGameObject->retracted()) {
                     if (m_hook.isStop()) {
                         m_score.get(m_focusedGameObject->getScore());
+                        playMusicForGameObject(*m_focusedGameObject);
                         m_gameObjects.erase(*m_focusedGameObject);
                         m_focusedGameObject = &nullObject;
                         m_miner.stop();
@@ -982,40 +1013,9 @@ private:
                     m_focusedGameObject->move(m_hook.getAngle());
                 }
             }
-            if (m_bombs[m_bombs.size() - 1].blowed()) {
-                m_bombs.erase(m_bombs[m_bombs.size() - 1]);
-            }
-            // for (GameObject& obj : m_gameObjects) {
-            //     if (obj.bombed()) {
-            //         m_gameObjects.erase(obj);
-            //         break;
-            //     }
-            //     if (obj.retracted()) {
-            //         if (m_hook.isStop()) {
-            //             m_score.get(obj.getScore());
-            //             m_gameObjects.erase(obj);
-            //             m_miner.stop();
-            //             break;
-            //         }
-            //         obj.move(m_hook.getAngle());
-            //     } else if (obj.isHooked(m_hook.getEndX(), m_hook.getEndY())) {
-            //         m_miner.useEnergy();
-            //         m_hook.setSpeed(obj.getSpeed());
-            //         m_hook.retract();
-            //         obj.retract();
-            //     }
-            // }
         }
     }
     void init_m_GameObjects() {
-        // diamond : 1 ~ 2   -> 1000 * num scores
-        // gold : 5 ~ 11     -> 320 * num scores
-        //   big : 30% 500
-        //   mid : 50% 300
-        //   sml : 20% 100
-        // rock : 3 ~ 7      -> 75 * num scores
-        //   mid : 50% 100
-        //   sml : 50% 50
         m_gameObjects.clear();
         int num_index = tanh(stage);
         int num_gold = 0;
@@ -1041,7 +1041,7 @@ private:
             int num_rock_mid = num_rock * 0.5;
             int num_rock_sml = num_rock * 0.5;
 
-            initOneTypeOfGameObjects(num_diamond, GameObjectType::DIAMOND, DiamondRadiusType::SMALL, img_diamond, mask_diamond);
+            initOneTypeOfGameObjects(num_diamond, GameObjectType::TREASURE, TreasureRadiusType::DIAMOND, img_diamond, mask_diamond);
             initOneTypeOfGameObjects(num_gold_big, GameObjectType::GOLD, GoldRadiusType::BIG, img_gold_big, mask_gold_big);
             initOneTypeOfGameObjects(num_gold_mid, GameObjectType::GOLD, GoldRadiusType::MID, img_gold_mid, mask_gold_mid);
             initOneTypeOfGameObjects(num_gold_sml, GameObjectType::GOLD, GoldRadiusType::SMALL, img_gold_small, mask_gold_small);
@@ -1064,7 +1064,8 @@ private:
     bool isTooClose(int x, int y, int radius) {
         if (!m_gameObjects.empty()) {
             for (GameObject& obj : m_gameObjects) {
-                if (std::pow((obj.getRx() - (x + radius)), 2) + std::pow((obj.getRy() - (y + radius)), 2) < std::pow((obj.getRadius() + radius + 0.1 * LENGTH_INDEX), 2)) {
+                if (std::pow((obj.getRx() - (x + radius)), 2) + std::pow((obj.getRy() - (y + radius)), 2) 
+                  < std::pow((obj.getRadius() + radius + 0.1 * LENGTH_INDEX), 2)) {
                     return true;
                 }
             }
@@ -1082,6 +1083,17 @@ private:
         for (int i = 0; i < 5; ++i) {
             m_bomb.setXY(0.56 * WID + BOMB_W * i, MINER_Y + MINER_H - BOMB_H);
             m_bombs.push_back(m_bomb);
+        }
+    }
+    void playMusicForGameObject(GameObject& obj) {
+        if (obj.getType() == GameObjectType::GOLD) {
+            playSpecialEffectMusic(musicPath_hook_gold);
+        } else if (obj.getType() == GameObjectType::ROCK) {
+            playSpecialEffectMusic(musicPath_hook_rock);
+        } else if (obj.getType() == GameObjectType::TREASURE) {
+            playSpecialEffectMusic(musicPath_hook_treasure);
+\        } else {
+            std::cerr << std::endl << "Error: GameObject type not recognized!" << std::endl;
         }
     }
     void callbackQuit() {
@@ -1279,8 +1291,8 @@ private:
         loadimage(&mask_rock_mid, maskPath_rock_mid.c_str(), 2 * RockRadiusType::MID, 2 * RockRadiusType::MID, true);
         loadimage(&img_rock_small, imgPath_rock_small.c_str(), 2 * RockRadiusType::SMALL, 2 * RockRadiusType::SMALL, true);
         loadimage(&mask_rock_small, maskPath_rock_small.c_str(), 2 * RockRadiusType::SMALL, 2 * RockRadiusType::SMALL, true);
-        loadimage(&img_diamond, imgPath_diamond.c_str(), 2 * DiamondRadiusType::SMALL, 2 * DiamondRadiusType::SMALL, true);
-        loadimage(&mask_diamond, maskPath_diamond.c_str(), 2 * DiamondRadiusType::SMALL, 2 * DiamondRadiusType::SMALL, true);
+        loadimage(&img_diamond, imgPath_diamond.c_str(), 2 * TreasureRadiusType::DIAMOND, 2 * TreasureRadiusType::DIAMOND, true);
+        loadimage(&mask_diamond, maskPath_diamond.c_str(), 2 * TreasureRadiusType::DIAMOND, 2 * TreasureRadiusType::DIAMOND, true);
         loadimage(&img_hook, imgPath_hook.c_str(), 35, 20, true);
         loadimage(&mask_hook, maskPath_hook.c_str(), 35, 20, true);
         loadimage(&img_bomb, imgPath_bomb.c_str(), BOMB_W, BOMB_H, true);
@@ -1345,10 +1357,10 @@ private:
         } else if (mask_rock_small.getwidth() != 2 * RockRadiusType::SMALL || mask_rock_small.getheight() != 2 * RockRadiusType::SMALL) {
             std::cerr << "Failed to load mask_rock_small!" << std::endl;
             return false;
-        } else if (img_diamond.getwidth() != 2 * DiamondRadiusType::SMALL || img_diamond.getheight() != 2 * DiamondRadiusType::SMALL) {
+        } else if (img_diamond.getwidth() != 2 * TreasureRadiusType::DIAMOND || img_diamond.getheight() != 2 * TreasureRadiusType::DIAMOND) {
             std::cerr << "Failed to load img_diamond!" << std::endl;
             return false;
-        } else if (mask_diamond.getwidth() != 2 * DiamondRadiusType::SMALL || mask_diamond.getheight() != 2 * DiamondRadiusType::SMALL) {
+        } else if (mask_diamond.getwidth() != 2 * TreasureRadiusType::DIAMOND || mask_diamond.getheight() != 2 * TreasureRadiusType::DIAMOND) {
             std::cerr << "Failed to load mask_diamond!" << std::endl;
             return false;
         } else if (img_hook.getwidth() != 35 || img_hook.getheight() != 20) {
