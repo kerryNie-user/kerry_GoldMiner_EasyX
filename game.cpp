@@ -23,7 +23,7 @@ LinkedList<std::string> storedPassword;
 LinkedList<int> storedStage;
 std::string username = "kerry";
 std::string password = "kerry";
-int stage = 2;
+int stage = 16;
 
 std::string filePath = "users.txt";
 std::string imgPath_startup = "res/img_startup.jpg";
@@ -55,7 +55,7 @@ std::string imgPath_explosive = "res/img_explosive.jpg";
 std::string maskPath_explosive = "res/img_explosive.jpg";
 std::string imgPath_game_end = "res/img_game_end.png";
 
-std::string musicPath_background = "res/music_background.mp3";
+std::string musicPath_background_normal = "res/music_background_normal.mp3";
 std::string musicPath_bomb_explosive = "res/music_bomb_explosive.mp3";
 std::string musicPath_hook_goingOut = "res/music_hook_goingOut.mp3";
 std::string musicPath_hook_treasure = "res/music_hook_treasure.mp3";
@@ -106,7 +106,7 @@ const int HOOK_X = MINER_X + MINER_W * 4 / 10;
 const int HOOK_Y = MINER_Y + MINER_H * 6 / 10;
 const int BOMB_W = 15;
 const int BOMB_H = 30;
-const int GAME_TIME = 80;
+const int GAME_TIME = 99;
 
 struct GoldRadiusType {
     static constexpr int BIG = 75;
@@ -125,8 +125,6 @@ struct TreasureRadiusType {
     static constexpr int MONEYBAG = 25;
 };
 
-#define degreesToRadians(angleDegrees) ((angleDegrees) * M_PI / 180.0)
-
 enum class GameSceneType {
     MENU,
     SIGNIN,
@@ -143,6 +141,15 @@ enum class GameObjectType {
     TREASURE
 };
 
+enum class GameStageType {
+    NORMAL,
+    STORMY,
+    QUICKSAND,
+    MAGNETIC
+};
+
+#define degreesToRadians(angleDegrees) ((angleDegrees) * M_PI / 180.0)
+
 class Clock {
 private:
     int start;
@@ -151,14 +158,17 @@ private:
     int remain;
     bool gameContinue;
     std::string display;
+
 public:
     Clock () {}
+
     void init(int total) {
         start = 0;
         this->total = total;
         gameContinue = true;
         display = "Time: 0";
     }
+
     void draw() {
         int textWidth = textwidth(display.c_str());
         int textHeight = textheight(display.c_str());
@@ -166,6 +176,7 @@ public:
         int textY = (50 - textHeight) / 2;
         outtextxy(textX, textY, display.c_str());
     }
+
     void update () {
         current = clock();
         if (start == 0) {
@@ -182,20 +193,33 @@ public:
         oss << std::setfill('0') << std::setw(2) << remain;
         display = "Time: " + oss.str();
     }
+
     bool isContinue() {
         return gameContinue;
+    }
+
+    int remainTime() {
+        return remain;
     }
 };
 
 class Score {
+    private:
+    int score;
+    int goal;
+    std::string displayScore;
+    std::string displayGoal;
+
 public:
     Score () {}
+
     void init(int goal) {
         score = 0;
         this->goal = goal;
         displayScore = "Score: 0";
         displayGoal = "Goal: " + std::to_string(goal);
     }
+
     void draw() {
         int textWidth1 = textwidth(displayScore.c_str());
         int textHeight1 = textheight(displayScore.c_str());
@@ -207,27 +231,14 @@ public:
         outtextxy(textX, textY1, displayScore.c_str());
         outtextxy(textX, textY2, displayGoal.c_str());
     }
+
     void get(int newScore) {
         score += newScore;
-        update();
+        displayScore = "Score: " + std::to_string(score);
     }
-    void los(int loseScore) {
-        score -= loseScore;
-        if (score < 0) {
-            score = 0;
-        }
-        update();
-    }
+
     bool reachGoal() {
         return score >= goal;
-    }
-private:
-    int score;
-    int goal;
-    std::string displayScore;
-    std::string displayGoal;
-    void update() {
-        displayScore = "Score: " + std::to_string(score);
     }
 };
 
@@ -235,15 +246,19 @@ class Stage {
 private:
     int stage;
     std::string display;
+
 public:
     Stage () {}
+
     void init(int stage) {
         this->stage = stage;
         display = "Stage: " + std::to_string(stage);
     }
+
     int getStage() {
         return stage;
     }
+
     void draw() {
         int textWidth = textwidth(display.c_str());
         int textHeight = textheight(display.c_str());
@@ -261,8 +276,13 @@ protected:
     bool isFocused = false;
     bool isReleased = false;
     std::string text;
+
     CControl(int x, int y, int w, int h, const std::string& text) : x(x), y(y), w(w), h(h), text(text) {}
-    virtual ~CControl() {}
+
+    bool isMouseInButton(int mouseX, int mouseY) {
+        return mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
+    }
+
 public:
     void draw() {
         setfillcolor(isFocused ? RGB(200, 200, 200) : WHITE);
@@ -276,19 +296,17 @@ public:
         int textY = y + (h - textHeight) / 2;
         outtextxy(textX, textY, _T(text).c_str());
     }
-protected:
-    bool isMouseInButton(int mouseX, int mouseY) {
-        return mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
-    }
 };
 
 class CButton : public CControl {
 private:
     int X, Y, W, H;
     ButtonCallBack callback;
+
 public:
     CButton(int x, int y, int w, int h, const std::string& text, ButtonCallBack callback) 
         : CControl(x, y, w, h, text), X(x), Y(y), W(w), H(h), callback(callback) {}
+
     void simulateMouseMSG(MOUSEMSG m) {
         if (isMouseInButton(m.x, m.y)) {
             if (m.uMsg == WM_LBUTTONDOWN) {
@@ -319,15 +337,18 @@ public:
 class CInputBox : public CControl {
 public:
     CInputBox(int x, int y, int w, int h) : CControl(x, y, w, h, "") {}
+
     std::string getInputText() const {
         return text;
     }
+
     void simulateMouseClick(int mouseX, int mouseY) {
         if (isMouseInButton(mouseX, mouseY)) {
             isFocused = true;
             handleEvent();
         }
     }
+
     void simulateMouseMSG(MOUSEMSG m) {
         if (isMouseInButton(m.x, m.y)) {
             if (m.uMsg == WM_LBUTTONDOWN) {
@@ -336,6 +357,7 @@ public:
             }
         }
     }
+
 private:
     void handleEvent() {
         while (true) {
@@ -374,6 +396,7 @@ private:
 class CObject {
 protected:
     virtual void draw() = 0;
+
     void putimgwithmask(IMAGE& img, IMAGE& mask, int x, int y) const {
         putimage(x, y, &mask, NOTSRCERASE);
         putimage(x, y, &img, SRCINVERT);
@@ -392,8 +415,10 @@ private:
     IMAGE mask1;
     IMAGE img2;
     IMAGE mask2;
+
 public:
     CMiner() : x(MINER_X), y(MINER_Y), w(MINER_W), h(MINER_H) {}
+
     void init(IMAGE& img1, IMAGE& mask1, IMAGE& img2, IMAGE& mask2) {
         this->working = false;
         this->usingEnergy = false;
@@ -403,6 +428,7 @@ public:
         this->img2 = img2;
         this->mask2 = mask2;
     }
+
     void draw() {
         if (working && showSecondImage) {
             putimgwithmask(img2, mask2, x, y);
@@ -410,17 +436,21 @@ public:
             putimgwithmask(img1, mask1, x, y);
         }
     }
+
     void work() {
         working = true;
     }
+
     void useEnergy() {
         working = true;
         usingEnergy = true;
     }
+
     void stop() {
         working = false;
         usingEnergy = false;
     }
+
     void update() {
         auto currentTime = std::chrono::system_clock::now();
         std::chrono::duration<double> elapsedTime = currentTime - lastTime;
@@ -435,34 +465,43 @@ public:
 class CHook : public CObject {
 private:
     int x, y;
-    int endX, endY;
+    double endX, endY;
     int length;
     int speed;
     double angle;
     double angleSpeed;
+    bool rotate = true;
     bool isMoving = false;
     bool isRetracting = false;
     IMAGE img;
     IMAGE mask;
     IMAGE img_rotate;
     IMAGE mask_rotate;
+
 public:
-    CHook() : x(HOOK_X), y(HOOK_Y), length(HOOK_LENGTH), speed(HOOK_SPEED), angleSpeed(SLEEP_TIME * 0.15) {}
+    CHook() : x(HOOK_X), y(HOOK_Y), length(HOOK_LENGTH), speed(HOOK_SPEED), angleSpeed(SLEEP_TIME * 0.15), rotate(true) {}
+
     void init(IMAGE& img, IMAGE& mask) {
         angle = 90;
         this->img = img;
         this->mask = mask;
     }
+
     void draw() {
         setcolor(BLACK);
         setlinestyle(PS_SOLID, 2);
         line(x, y, endX, endY);
-        rotateimage(&img_rotate, &img, degreesToRadians(90 - angle), WHITE, true);
-        rotateimage(&mask_rotate, &mask, degreesToRadians(90 - angle), BLACK, true);
-        int imageX = endX - img.getwidth() * std::sin(degreesToRadians(angle)) / 2 - img.getheight() * (1 - std::cos(degreesToRadians(angle))) / 2;
-        int imageY = endY - img.getwidth() * std::abs(std::cos(degreesToRadians(angle))) / 2;
-        putimgwithmask(img_rotate, mask_rotate, imageX, imageY);
+        if (rotate) {
+            rotateimage(&img_rotate, &img, degreesToRadians(90 - angle), WHITE, true);
+            rotateimage(&mask_rotate, &mask, degreesToRadians(90 - angle), BLACK, true);
+            int imageX = endX - img.getwidth() * std::sin(degreesToRadians(angle)) / 2 - img.getheight() * (1 - std::cos(degreesToRadians(angle))) / 2;
+            int imageY = endY - img.getwidth() * std::abs(std::cos(degreesToRadians(angle))) / 2;
+            putimgwithmask(img_rotate, mask_rotate, imageX, imageY);
+        } else {
+            putimgwithmask(img, mask, endX - img.getwidth() / 2, endY);
+        }
     }
+
     void update() {
         if (isRetracting && !isMoving) {
             std::cerr << "There's something wrong with hook update" << std::endl;
@@ -494,39 +533,61 @@ public:
             }
         }
     }
+
     bool isGoingOut() {
         return length > HOOK_LENGTH && isMoving;
     }
+
     bool isGoingBack() {
         return length > HOOK_LENGTH && isMoving && isRetracting;
     }
     bool isStop() {
         return (!isMoving) && (!isRetracting) && (length <= HOOK_LENGTH);
     }
+
+    void setmageticmode() {
+        rotate = false;
+    }
+
     void setSpeed(int speed) {
         this->speed = speed;
     }
-    int getEndX() const {
-        return endX;
-    }
-    int getEndY() const {
-        return endY;
-    }
-    int getLength() const {
-        return length;
-    }
-    double getAngle() const {
-        return angle;
-    }
+
     void move() {
         isMoving = true;
     }
+
+    void magnetic(int magnetic_source_x, int magnetic_source_y, int magnetic_strength) { //  i need to control angel instead endX and endY
+        int distance_x = magnetic_source_x - endX;
+        int distance_y = magnetic_source_y - endY;
+        double magnetic_force = magnetic_strength / std::sqrt(std::pow(distance_x, 2) + std::pow(distance_y, 2));// / (std::pow(distance_x, 2) + std::pow(distance_y, 2));
+        endX += magnetic_force * distance_x;
+        endY += magnetic_force * distance_y;
+    }
+
     void retract() {
         isRetracting = true;
     }
+
     void stop() {
         isMoving = false;
         isRetracting = false;
+    }
+    
+    int getEndX() const {
+        return endX;
+    }
+
+    int getEndY() const {
+        return endY;
+    }
+
+    int getLength() const {
+        return length;
+    }
+
+    double getAngle() const {
+        return angle;
     }
 };
 
@@ -536,24 +597,27 @@ private:
     bool blowUp;
     IMAGE imgB;
     IMAGE maskB;
+
 public:
     CBomb() : blowUp(false) {}
+
     bool operator==(const CBomb& other) const {
         return this->x == other.x && this->y == other.y;
     }
+
     void init(IMAGE& imgB, IMAGE& maskB) {
         this->imgB = imgB;
         this->maskB = maskB;
     }
+
     void setXY(int x, int y) {
         this->x = x;
         this->y = y;
     }
+
     void draw() override {
         putimgwithmask(imgB, maskB, x, y);
     }
-    void blow() { blowUp = true; }
-    bool blowed() { return blowUp; }
 };
 
 class GameObject : public CObject {
@@ -567,13 +631,17 @@ protected:
     bool isRetracting = false;
     IMAGE img;
     IMAGE mask;
+
 public:
     GameObject() {}
+
     GameObject(GameObjectType type, double x, double y, const int radiusType, IMAGE& img, IMAGE& mask)
-         : type(type), x(x), y(y), radius(radiusType), img(img), mask(mask) {}
+        : type(type), x(x), y(y), radius(radiusType), img(img), mask(mask) {}
+
     GameObject(const GameObject& other)
         : type(other.type), x(other.x), y(other.y), radius(other.radius), speed(other.speed), score(other.score), 
         isBombed(other.isBombed), isRetracting(other.isRetracting), img(other.img), mask(other.mask) {}
+
     GameObject& operator=(const GameObject& other) {
         if (this != &other) {
             type = other.type;
@@ -589,30 +657,71 @@ public:
         }
         return *this;
     }
+
     bool operator==(const GameObject& other) const {
         return this->type == other.type && this->x == other.x && this->y == other.y && this->radius == other.radius;
     }
+
     bool operator!=(const GameObject& other) const {
         return !operator==(other);
     }
+
     void draw() {
         putimgwithmask(img, mask, x, y);
     }
-    GameObjectType getType() const { return type; }
-    void retract() { isRetracting = true; }
-    bool retracted() { return isRetracting; }
-    bool isHooked(int hookX, int hookY) { return std::pow((x + radius - hookX), 2) + std::pow((y + radius - hookY), 2) - radius * radius <= 35; }
+
+    void retract() {
+        isRetracting = true;
+    }
+
     void move(int moveangle) {
         x -= speed * cos(degreesToRadians(moveangle));
         y -= speed * sin(degreesToRadians(moveangle));
     }
-    int getScore() const { return score; }
-    int getSpeed() const { return speed; }
-    int getRadius() const { return radius; }
-    int getRx() const { return x + radius; }
-    int getRy() const { return y + radius; }
-    void bomb() { isBombed = true; }
-    bool bombed() const { return isBombed; }
+
+    void submerge(int distance) {
+        y += distance;
+    }
+        
+    void bomb() {
+        isBombed = true;
+    }
+
+    bool retracted() {
+        return isRetracting;
+    }
+    
+    bool isHooked(int hookX, int hookY) {
+        return std::pow((x + radius - hookX), 2) + std::pow((y + radius - hookY), 2) - radius * radius <= 35;
+    }
+
+    bool bombed() const {
+        return isBombed;
+    }
+
+    GameObjectType getType() const {
+        return type;
+    }
+    
+    int getScore() const {
+        return score;
+    }
+    
+    int getSpeed() const {
+        return speed;
+    }
+    
+    int getRadius() const {
+        return radius;
+    }
+    
+    int getRx() const {
+        return x + radius;
+    }
+    
+    int getRy() const {
+        return y + radius;
+    }
 };
 
 class Gold : public GameObject {
@@ -681,10 +790,12 @@ class CScene {
 protected:
     int m_scene;
     std::function<void(GameSceneType)> setGameScene;
+
 public:
     CScene(const std::function<void(GameSceneType)>& setGameScene) : setGameScene(setGameScene) {}
     virtual void update() = 0;
     virtual void render() = 0;
+
 protected:
     void outputStatus(std::string text) {
         setbkmode(TRANSPARENT);
@@ -698,11 +809,13 @@ protected:
         FlushBatchDraw();
         Sleep(1000);
     }
+
     void playBackgroundMusic(std::string& music) {
         mciSendString("close bkmusic", NULL, 0, NULL);
         mciSendString(("open " + music + " alias bkmusic").c_str(), NULL, 0, NULL);
         mciSendString("play bkmusic repeat", NULL, 0, NULL);
     }
+
     void playSpecialEffectMusic(std::string& music) {
         mciSendString("close specialEffect", NULL, 0, NULL);
         mciSendString(("open " + music + " alias specialEffect").c_str(), NULL, 0, NULL);
@@ -714,10 +827,12 @@ class CMenu : public CScene {
 private:
     CButton m_button_signin;
     CButton m_button_login;
+
 public:
     CMenu(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene),
         m_button_signin(0.1 * WID, 0.7 * HEI, 0.3 * WID, 0.08 * HEI, "signin", std::bind(&CMenu::callbackSignin, this)), 
         m_button_login(0.6 * WID, 0.7 * HEI, 0.3 * WID, 0.08 * HEI, "login", std::bind(&CMenu::callbackLogin, this)) {}
+
     void update() override{
         MOUSEMSG m;
         if (MouseHit()) {
@@ -726,17 +841,19 @@ public:
             m_button_login.simulateMouseMSG(m);
         }
     }
+
     void render() override {
         cleardevice();
         putimage(0, 0, &img_startup);
         m_button_login.draw();
         m_button_signin.draw();
-        FlushBatchDraw();
     }
+
 private:
     void callbackSignin() {
         setGameScene(GameSceneType::SIGNIN);
     }
+
     void callbackLogin() {
         setGameScene(GameSceneType::LOGIN);
     }
@@ -750,6 +867,7 @@ private:
     CInputBox m_input_confirm;
     CButton m_button_ok;
     CButton m_button_cancel;
+
 public:
     CSignin(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), confirm(false), 
         m_input_username(0.34 * WID, 0.44 * HEI, 0.48 * WID, 0.12 * HEI), 
@@ -757,6 +875,7 @@ public:
         m_input_confirm(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI), 
         m_button_ok(0.8 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "OK", std::bind(&CSignin::callbackOk, this)), 
         m_button_cancel(0.04 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "CANCEL", std::bind(&CSignin::callbackCancel, this)) {}
+
     void update() override {
         MOUSEMSG m;
         if (MouseHit()) {
@@ -771,6 +890,7 @@ public:
             m_button_cancel.simulateMouseMSG(m);
         }
     }
+
     void render() override {
         cleardevice();
         putimage(0, 0, &img_signin);
@@ -787,8 +907,8 @@ public:
         }
         m_button_ok.draw();
         m_button_cancel.draw();
-        FlushBatchDraw();
     }
+
 private:
     void callbackOk() {
         if (confirm) {
@@ -824,6 +944,7 @@ private:
             confirm = true;
         }
     }
+
     void callbackCancel() {
         if (confirm) {
             confirm = false;
@@ -845,6 +966,7 @@ public:
         m_button_cancel(0.04 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "CANCEL", std::bind(&CLogin::callbackCancel, this)),
         m_input_username(0.34 * WID, 0.44 * HEI, 0.48 * WID, 0.12 * HEI),
         m_input_password(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI) {}
+
     void update() override {
         MOUSEMSG m;
         if (MouseHit()) {
@@ -855,6 +977,7 @@ public:
             m_button_cancel.simulateMouseMSG(m);
         }
     }
+
     void render() override {
         cleardevice();
         putimage(0, 0, &img_signin);
@@ -867,8 +990,8 @@ public:
         m_input_password.draw();
         m_button_ok.draw();
         m_button_cancel.draw();
-        FlushBatchDraw();
     }
+
 private:
     void callbackOk() {
         username = m_input_username.getInputText();
@@ -883,6 +1006,7 @@ private:
         }
         outputStatus("Username or Password incorrect");
     }
+
     void callbackCancel() {
         setGameScene(GameSceneType::MENU);
     }
@@ -892,8 +1016,13 @@ int goal = 0;
 IMAGE img_null;
 GameObject nullObject(GameObjectType::GOLD, 0, 0, GoldRadiusType::BIG, img_null, img_null);
 
+// stage 1 ~ 5 normal levels
+// stage 6 ~ 10 stormy levels
+// stage 11 ~ 15 quicksand levels
+// stage 16 ~ 20 magnetic levels
+
 class CGame : public CScene {
-private:
+protected:
     Clock m_clock;
     Score m_score;
     Stage m_stage;
@@ -901,14 +1030,14 @@ private:
     CHook m_hook;
     CBomb m_bomb;
     CButton m_button_quit;
-    bool gaming = false;
-    bool isSpecialLevel = false;
     GameObject* m_focusedGameObject = &nullObject;
-public:
+
     CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), m_clock(), m_score(), m_stage(), m_miner(), m_hook(), m_bomb(),
         m_button_quit(0.65 * WID, (MINER_Y + MINER_H - 0.08 * HEI) / 2, 0.12 * WID, 0.08 * HEI, "Quit", std::bind(&CGame::callbackQuit, this)) {}
+    
+public:
     void initGameObjects() {
-        goal = 1000 + (int)(6 * std::sqrt(stage)) * 100;
+        goal = 1000 + (int)(6 * std::sqrt(stage % 5 + 1)) * 100;
         m_gameObjects.clear();
         m_stage.init(stage);
         m_clock.init(GAME_TIME);
@@ -918,12 +1047,13 @@ public:
         m_bomb.init(img_bomb, mask_bomb);
         init_m_GameObjects();
         init_m_Boombs();
-        playBackgroundMusic(musicPath_background);
     }
+
     void update() override {
         updateWithInput();
         updateWithoutInput();
     }
+
     void render() override {
         cleardevice();
         setbkcolor(WHITE);
@@ -932,20 +1062,23 @@ public:
         settextcolor(BLACK);
         putimage(0, MINER_Y + MINER_H + 10, &img_game_background);
         putimage(0, MINER_Y + MINER_H, &img_brick);
+        for (CBomb& bomb : m_bombs) {
+            bomb.draw();
+        }
+        for (GameObject& obj : m_gameObjects) {
+            obj.draw();
+        }
+        if (m_focusedGameObject != &nullObject) {
+            m_focusedGameObject->draw();
+        }
         m_clock.draw();
         m_score.draw();
         m_stage.draw();
         m_miner.draw();
         m_hook.draw();
         m_button_quit.draw();
-        for (CBomb& bomb : m_bombs) { bomb.draw(); }
-        for (GameObject& obj : m_gameObjects) { obj.draw(); }
-        if (m_focusedGameObject != &nullObject) { m_focusedGameObject->draw(); }
-        FlushBatchDraw();
     }
-    bool gameStarted() const { return gaming; }
-    void start() { gaming = true; }
-    void over() { gaming = false; }
+
 private:
     void updateWithInput() {
         if (MouseHit()) {
@@ -966,6 +1099,7 @@ private:
             m_button_quit.simulateMouseMSG(m);
         }
     }
+
     void updateWithoutInput() {
         if (!m_clock.isContinue()) {
             if (m_score.reachGoal()) {
@@ -1015,40 +1149,37 @@ private:
             }
         }
     }
+
     void init_m_GameObjects() {
         m_gameObjects.clear();
         int num_index = tanh(stage);
-        int num_gold = 0;
-        int num_rock = 0;
-        int num_diamond = 0;
-        if (!isSpecialLevel) {
-            num_diamond = num_index + rand() % 2;
-            num_gold = 3 + 8 * num_index + rand() % 3;
-            num_rock = 3 + 3 * num_index + rand() % 2;
-            while (1000 * num_diamond + 320 * num_gold + 75 * num_rock - goal < 500) {
-                int random = rand() % 20;
-                if (random == 0) {
-                    ++ num_diamond;
-                } else if (random < 8) {
-                    ++ num_gold;
-                } else {
-                    ++ num_rock;
-                }
+        int num_gold = 3 + 8 * num_index + rand() % 3;
+        int num_rock = 3 + 3 * num_index + rand() % 2;
+        int num_diamond = num_index + rand() % 2;
+        while (1000 * num_diamond + 320 * num_gold + 75 * num_rock - goal < 500) {
+            int random = rand() % 20;
+            if (random == 0) {
+                ++ num_diamond;
+            } else if (random < 8) {
+                ++ num_gold;
+            } else {
+                ++ num_rock;
             }
-            int num_gold_big = num_gold * 0.3;
-            int num_gold_mid = num_gold * 0.5;
-            int num_gold_sml = num_gold * 0.2;
-            int num_rock_mid = num_rock * 0.5;
-            int num_rock_sml = num_rock * 0.5;
-
-            initOneTypeOfGameObjects(num_diamond, GameObjectType::TREASURE, TreasureRadiusType::DIAMOND, img_diamond, mask_diamond);
-            initOneTypeOfGameObjects(num_gold_big, GameObjectType::GOLD, GoldRadiusType::BIG, img_gold_big, mask_gold_big);
-            initOneTypeOfGameObjects(num_gold_mid, GameObjectType::GOLD, GoldRadiusType::MID, img_gold_mid, mask_gold_mid);
-            initOneTypeOfGameObjects(num_gold_sml, GameObjectType::GOLD, GoldRadiusType::SMALL, img_gold_small, mask_gold_small);
-            initOneTypeOfGameObjects(num_rock_mid, GameObjectType::ROCK, RockRadiusType::MID, img_rock_mid, mask_rock_mid);
-            initOneTypeOfGameObjects(num_rock_sml, GameObjectType::ROCK, RockRadiusType::SMALL, img_rock_small, mask_rock_small);
         }
+        int num_gold_big = num_gold * 0.3;
+        int num_gold_mid = num_gold * 0.5;
+        int num_gold_sml = num_gold * 0.2;
+        int num_rock_mid = num_rock * 0.5;
+        int num_rock_sml = num_rock * 0.5;
+
+        initOneTypeOfGameObjects(num_diamond, GameObjectType::TREASURE, TreasureRadiusType::DIAMOND, img_diamond, mask_diamond);
+        initOneTypeOfGameObjects(num_gold_big, GameObjectType::GOLD, GoldRadiusType::BIG, img_gold_big, mask_gold_big);
+        initOneTypeOfGameObjects(num_gold_mid, GameObjectType::GOLD, GoldRadiusType::MID, img_gold_mid, mask_gold_mid);
+        initOneTypeOfGameObjects(num_gold_sml, GameObjectType::GOLD, GoldRadiusType::SMALL, img_gold_small, mask_gold_small);
+        initOneTypeOfGameObjects(num_rock_mid, GameObjectType::ROCK, RockRadiusType::MID, img_rock_mid, mask_rock_mid);
+        initOneTypeOfGameObjects(num_rock_sml, GameObjectType::ROCK, RockRadiusType::SMALL, img_rock_small, mask_rock_small);
     }
+
     void initOneTypeOfGameObjects(int num, GameObjectType type, int radius, IMAGE& img, IMAGE& mask) {
         int x, y;
         GameObject obj;
@@ -1061,6 +1192,15 @@ private:
             m_gameObjects.push_back(obj);
         }
     }
+
+    void init_m_Boombs() {
+        m_bombs.clear();
+        for (int i = 0; i < 5; ++i) {
+            m_bomb.setXY(0.56 * WID + BOMB_W * i, MINER_Y + MINER_H - BOMB_H);
+            m_bombs.push_back(m_bomb);
+        }
+    }
+
     bool isTooClose(int x, int y, int radius) {
         if (!m_gameObjects.empty()) {
             for (GameObject& obj : m_gameObjects) {
@@ -1072,19 +1212,14 @@ private:
         }
         return false;
     }
+
     bool outOfBounds(int x, int y, int radius) {
         if (WID - radius - 20 <= 20 || HEI - radius - 20 <= WID / 4) {
             std::cerr << "Error: bounds too small !" << std::endl;
         }
         return x < 20 || x > WID - radius - 20 || y < HEI / 4 || y > HEI - radius - 20;
     }
-    void init_m_Boombs() {
-        m_bombs.clear();
-        for (int i = 0; i < 5; ++i) {
-            m_bomb.setXY(0.56 * WID + BOMB_W * i, MINER_Y + MINER_H - BOMB_H);
-            m_bombs.push_back(m_bomb);
-        }
-    }
+
     void playMusicForGameObject(GameObject& obj) {
         if (obj.getType() == GameObjectType::GOLD) {
             playSpecialEffectMusic(musicPath_hook_gold);
@@ -1092,15 +1227,159 @@ private:
             playSpecialEffectMusic(musicPath_hook_rock);
         } else if (obj.getType() == GameObjectType::TREASURE) {
             playSpecialEffectMusic(musicPath_hook_treasure);
-\        } else {
+        } else {
             std::cerr << std::endl << "Error: GameObject type not recognized!" << std::endl;
         }
     }
+
     void callbackQuit() {
         setGameScene(GameSceneType::OVER);
         outputStatus("GoodBye!");
     }
 };
+
+class CGameNormal : public CGame {
+public:
+    CGameNormal(const std::function<void(GameSceneType)>& setGameScene) : CGame(setGameScene) {}
+
+    void init() {
+        CGame::initGameObjects();
+        playBackgroundMusic(musicPath_background_normal);
+    }
+
+    void update() {
+        CGame::update();
+    }
+
+    void render() {
+        CGame::render();
+    }
+};
+
+class CGameStormy : public CGame {
+private:
+    int startTime = 3;
+    int stormyTime = 1;
+    int stormyInterval = 6;
+    bool storming = true;
+
+public:
+    CGameStormy(const std::function<void(GameSceneType)>& setGameScene) : CGame(setGameScene) {}
+
+    void init() {
+        CGame::initGameObjects();
+        playBackgroundMusic(musicPath_background_normal);
+    }
+
+    void update() {
+        CGame::update();
+        if (m_clock.remainTime() + startTime < GAME_TIME && 
+            (m_clock.remainTime() + startTime) % (stormyTime + stormyInterval) > stormyTime) {
+            storming = true;
+        } else {
+            storming = false;
+        }
+    }
+
+    void render() override {
+        cleardevice();
+        setbkcolor(WHITE);
+        setbkmode(TRANSPARENT);
+        settextstyle(40, 0, _T("宋体"));
+        settextcolor(BLACK);
+        putimage(0, MINER_Y + MINER_H, &img_brick);
+        if (storming) {
+            setfillcolor(BLACK);
+            fillrectangle(0, MINER_Y + MINER_H + 10, WID, HEI);
+        } else {
+            putimage(0, MINER_Y + MINER_H + 10, &img_game_background);
+            for (GameObject& obj : m_gameObjects) {
+                obj.draw();
+            }
+        }
+        if (m_focusedGameObject != &nullObject) {
+            m_focusedGameObject->draw();
+        }
+        for (CBomb& bomb : m_bombs) {
+            bomb.draw();
+        }
+        m_clock.draw();
+        m_score.draw();
+        m_stage.draw();
+        m_miner.draw();
+        m_hook.draw();
+        m_button_quit.draw();
+    }
+};
+
+class CGameQuicksand : public CGame {
+private:
+    int lastRemainTime = GAME_TIME;
+
+public:
+    CGameQuicksand(const std::function<void(GameSceneType)>& setGameScene) : CGame(setGameScene) {}
+
+    void init() {
+        CGame::initGameObjects();
+        playBackgroundMusic(musicPath_background_normal);
+    }
+
+    void update() {
+        CGame::update();
+        if (lastRemainTime != m_clock.remainTime()) {
+            lastRemainTime = m_clock.remainTime();
+            for (GameObject& obj : m_gameObjects) {
+                if (obj.getRy() + obj.getRadius() < HEI && !obj.retracted()) {
+                    obj.submerge(obj.getRadius() / 75 + 1);
+                }
+            }
+        }
+    }
+
+    void render() {
+        CGame::render();
+    }
+};
+
+class CGameMagnetic : public CGame {
+public:
+    CGameMagnetic(const std::function<void(GameSceneType)>& setGameScene) : CGame(setGameScene) {}
+
+    void init() {
+        CGame::initGameObjects();
+        m_hook.setmageticmode();
+        playBackgroundMusic(musicPath_background_normal);
+    }
+
+    void update() {
+        CGame::update();
+        if (m_hook.isGoingOut()) {
+            m_hook.magnetic(WID / 2, HEI, 100);
+        }
+    }
+
+    void render() {
+        CGame::render();
+    }
+};
+
+class CGameFactory {
+    public:
+        static CGame* createGame(GameStageType type, const std::function<void(GameSceneType)>& setGameScene) {
+            switch (type) {
+                case GameStageType::NORMAL:
+                    return new CGameNormal(setGameScene);
+                case GameStageType::STORMY:
+                    return new CGameStormy(setGameScene);
+                case GameStageType::QUICKSAND:
+                    return new CGameQuicksand(setGameScene);
+                case GameStageType::MAGNETIC:
+                    return new CGameMagnetic(setGameScene);
+                default:
+                    throw std::invalid_argument("Invalid GameObjectType");
+            }
+        }
+    };
 
 class CWin : public CScene {
 private:
@@ -1182,20 +1461,21 @@ private:
     CMenu m_menu;
     CSignin m_signin;
     CLogin m_login;
-    CGame m_game;
+    CGame* m_game = nullptr;
     CWin m_win;
     CLose m_lose;
+
 public:
     Game(): m_game_scene(GameSceneType::GAME),
             m_menu([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_signin([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_login([this](GameSceneType scene) { this->m_game_scene = scene; }),
-            m_game([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_win([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_lose([this](GameSceneType scene) { this->m_game_scene = scene; }) {
                 loadTEXT();
                 loadIMAGE();
             }
+
     void run() {
         if (proofreadIMAGE()) {
             initgraph(WID, HEI);
@@ -1215,25 +1495,35 @@ public:
                         m_login.render();
                         break;
                     case GameSceneType::GAME:
-                        if (!m_game.gameStarted()) {
-                            m_game.initGameObjects();
-                            m_game.start();
+                        if (m_game == nullptr) {
+                            std::cout << "Stage: " << stage << " ";
+                            if (stage < 6) {
+                                m_game = CGameFactory::createGame(GameStageType::NORMAL, [this](GameSceneType scene) { this->m_game_scene = scene; });
+                                std::cout << "Normal" << std::endl;
+                            } else if (stage < 11) {
+                                m_game = CGameFactory::createGame(GameStageType::STORMY, [this](GameSceneType scene) { this->m_game_scene = scene; });
+                            } else if (stage < 16) {
+                                m_game = CGameFactory::createGame(GameStageType::QUICKSAND, [this](GameSceneType scene) { this->m_game_scene = scene; });
+                            } else if (stage < 21){
+                                m_game = CGameFactory::createGame(GameStageType::MAGNETIC, [this](GameSceneType scene) { this->m_game_scene = scene; });
+                            }
+                            m_game->initGameObjects();
                         }
-                        m_game.update();
-                        m_game.render();
+                        m_game->update();
+                        m_game->render();
                         break;
                     case GameSceneType::WIN:
-                        m_game.over();
                         m_win.update();
                         m_win.render();
+                        m_game = nullptr;
                         break;
                     case GameSceneType::LOSE:
-                        m_game.over();
                         m_lose.update();
                         m_lose.render();
+                        m_game = nullptr;
                         break;
                     default:
-                        m_game.over();
+                        m_game = nullptr;
                         EndBatchDraw();
                         writeTEXT();
                         closegraph();
@@ -1246,6 +1536,7 @@ public:
             std::cerr << "There're something wrong with image loading" << std::endl;
         }
     }
+
 private:
     bool loadTEXT() {
         std::ifstream file(filePath);
@@ -1271,6 +1562,7 @@ private:
         }
         return true;
     }
+
     void loadIMAGE() {
         loadimage(&img_startup, imgPath_startup.c_str(), WID, HEI, true);    
         loadimage(&img_signin, imgPath_signin.c_str(), WID, HEI, true);
@@ -1299,6 +1591,7 @@ private:
         loadimage(&mask_bomb, maskPath_bomb.c_str(), BOMB_W, BOMB_H, true);
         loadimage(&img_game_end, imgPath_game_end.c_str(), WID, HEI, true);
     }
+
     bool proofreadIMAGE() {
         if (img_startup.getwidth() != WID || img_startup.getheight() != HEI) {
             std::cerr << "Failed to load img_startup!" << std::endl;
@@ -1382,6 +1675,7 @@ private:
             return true;
         }
     }
+
     void writeTEXT() {
         for (int i = 0; i < storedUsername.size(); ++i) {
             if (username == storedUsername[i]) {
