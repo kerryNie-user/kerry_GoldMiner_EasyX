@@ -23,7 +23,7 @@ LinkedList<std::string> storedPassword;
 LinkedList<int> storedStage;
 std::string username = "kerry";
 std::string password = "kerry";
-int stage = 16;
+int stage = 15;
 
 std::string filePath = "users.txt";
 std::string imgPath_startup = "res/img_startup.jpg";
@@ -54,14 +54,20 @@ std::string maskPath_bomb = "res/img_bomb_mask.jpg";
 std::string imgPath_explosive = "res/img_explosive.jpg";
 std::string maskPath_explosive = "res/img_explosive.jpg";
 std::string imgPath_game_end = "res/img_game_end.png";
+std::string imgPath_game_over = "res/img_game_over.jpeg";
 
 std::string musicPath_background_normal = "res/music_background_normal.mp3";
+std::string musicPath_background_stormy = "res/music_background_stormy.mp3";
+std::string musicPath_background_quicksand = "res/music_background_quicksand.mp3";
+std::string musicPath_background_magnetic = "res/music_background_magnetic.mp3";
+
 std::string musicPath_bomb_explosive = "res/music_bomb_explosive.mp3";
 std::string musicPath_hook_goingOut = "res/music_hook_goingOut.mp3";
 std::string musicPath_hook_treasure = "res/music_hook_treasure.mp3";
 std::string musicPath_hook_gold = "res/music_hook_gold.mp3";
 std::string musicPath_hook_rock = "res/music_hook_rock.mp3";
 std::string musicPath_transition = "res/music_transition.mp3";
+std::string musicPath_thunder = "res/music_thunder.mp3";
 
 IMAGE img_startup;
 IMAGE img_signin;
@@ -132,7 +138,8 @@ enum class GameSceneType {
     GAME,
     WIN,
     LOSE,
-    OVER
+    OVER,
+    NULLSCENE
 };
 
 enum class GameObjectType {
@@ -535,7 +542,7 @@ public:
     }
 
     bool isGoingOut() {
-        return length > HOOK_LENGTH && isMoving;
+        return length > HOOK_LENGTH && isMoving && !isRetracting;
     }
 
     bool isGoingBack() {
@@ -557,12 +564,13 @@ public:
         isMoving = true;
     }
 
-    void magnetic(int magnetic_source_x, int magnetic_source_y, int magnetic_strength) { //  i need to control angel instead endX and endY
+    void magnetic(int magnetic_source_x, int magnetic_source_y, double magnetic_strength) {
+        int angle_target = std::atan2(magnetic_source_y - y, magnetic_source_x - x) * 180 / M_PI;
+        int angle_distance = angle_target - angle;
         int distance_x = magnetic_source_x - endX;
         int distance_y = magnetic_source_y - endY;
-        double magnetic_force = magnetic_strength / std::sqrt(std::pow(distance_x, 2) + std::pow(distance_y, 2));// / (std::pow(distance_x, 2) + std::pow(distance_y, 2));
-        endX += magnetic_force * distance_x;
-        endY += magnetic_force * distance_y;
+        double magnetic_force = magnetic_strength / std::sqrt(std::pow(distance_x, 2) + std::pow(distance_y, 2));
+        angle += magnetic_force * angle_distance;
     }
 
     void retract() {
@@ -628,7 +636,6 @@ protected:
     int speed;
     int score;
     bool isBombed = false;
-    bool isRetracting = false;
     IMAGE img;
     IMAGE mask;
 
@@ -640,7 +647,7 @@ public:
 
     GameObject(const GameObject& other)
         : type(other.type), x(other.x), y(other.y), radius(other.radius), speed(other.speed), score(other.score), 
-        isBombed(other.isBombed), isRetracting(other.isRetracting), img(other.img), mask(other.mask) {}
+        isBombed(other.isBombed), img(other.img), mask(other.mask) {}
 
     GameObject& operator=(const GameObject& other) {
         if (this != &other) {
@@ -651,7 +658,6 @@ public:
             speed = other.speed;
             score = other.score;
             isBombed = other.isBombed;
-            isRetracting = other.isRetracting;
             img = other.img;
             mask = other.mask;
         }
@@ -670,10 +676,6 @@ public:
         putimgwithmask(img, mask, x, y);
     }
 
-    void retract() {
-        isRetracting = true;
-    }
-
     void move(int moveangle) {
         x -= speed * cos(degreesToRadians(moveangle));
         y -= speed * sin(degreesToRadians(moveangle));
@@ -685,10 +687,6 @@ public:
         
     void bomb() {
         isBombed = true;
-    }
-
-    bool retracted() {
-        return isRetracting;
     }
     
     bool isHooked(int hookX, int hookY) {
@@ -1121,22 +1119,23 @@ private:
             if (m_hook.isStop()) {
                 m_miner.stop();
             }
-            if (m_hook.isGoingOut() && m_focusedGameObject == &nullObject) {
-                for (GameObject& obj : m_gameObjects) {
-                    if (obj.isHooked(m_hook.getEndX(), m_hook.getEndY())) {
-                        m_miner.useEnergy();
-                        m_hook.setSpeed(obj.getSpeed());
-                        m_hook.retract();
-                        obj.retract();
-                        m_focusedGameObject = &obj;
+            if (m_focusedGameObject == &nullObject) {
+                if (m_hook.isGoingOut()) {
+                    for (GameObject& obj : m_gameObjects) {
+                        if (obj.isHooked(m_hook.getEndX(), m_hook.getEndY())) {
+                            m_miner.useEnergy();
+                            m_hook.setSpeed(obj.getSpeed());
+                            m_hook.retract();
+                            m_focusedGameObject = &obj;
+                        }
                     }
                 }
-            } else if (m_focusedGameObject != &nullObject) {
+            } else {
                 if (m_focusedGameObject->bombed()) {
                     m_bombs.erase(m_bombs[m_bombs.size() - 1]);
                     m_gameObjects.erase(*m_focusedGameObject);
                     m_focusedGameObject = &nullObject;
-                } else if (m_focusedGameObject->retracted()) {
+                } else {
                     if (m_hook.isStop()) {
                         m_score.get(m_focusedGameObject->getScore());
                         playMusicForGameObject(*m_focusedGameObject);
@@ -1233,7 +1232,7 @@ private:
     }
 
     void callbackQuit() {
-        setGameScene(GameSceneType::OVER);
+        setGameScene(GameSceneType::NULLSCENE);
         outputStatus("GoodBye!");
     }
 };
@@ -1244,6 +1243,7 @@ public:
 
     void init() {
         CGame::initGameObjects();
+        outputStatus("This is just the beginning, so only higher and higher goals");
         playBackgroundMusic(musicPath_background_normal);
     }
 
@@ -1261,23 +1261,59 @@ private:
     int startTime = 3;
     int stormyTime = 1;
     int stormyInterval = 6;
-    bool storming = true;
+    bool dark = true;
+    bool thundering = false;
 
 public:
     CGameStormy(const std::function<void(GameSceneType)>& setGameScene) : CGame(setGameScene) {}
 
     void init() {
         CGame::initGameObjects();
-        playBackgroundMusic(musicPath_background_normal);
+        switch (stage) {
+            case 6: // Stormy start
+                stormyTime = 2;
+                stormyInterval = 6;
+                outputStatus("Stormy start, so the game is a little bit harder");
+                break;
+            case 7: // More game objects
+                stormyTime = 2;
+                stormyInterval = 6;
+                outputStatus("More game objects");
+                break;
+            case 8: // The days are shorter
+                stormyTime = 1;
+                stormyInterval = 6;
+                outputStatus("The days are shorter");
+                break;
+            case 9: // The nights are longer
+                stormyTime = 1;
+                stormyInterval = 7;
+                outputStatus("The nights are longer");
+                break;
+            case 10: // Faster storms with less time to watch
+                startTime = 1;
+                stormyTime = 1;
+                stormyInterval = 7;
+                outputStatus("Faster storms with less time to watch");
+                break;
+            default:
+                break;
+        }
+        playBackgroundMusic(musicPath_background_stormy);
     }
 
     void update() {
         CGame::update();
         if (m_clock.remainTime() + startTime < GAME_TIME && 
             (m_clock.remainTime() + startTime) % (stormyTime + stormyInterval) > stormyTime) {
-            storming = true;
+            thundering = false;
+            dark = true;
         } else {
-            storming = false;
+            if (thundering == false) {
+                playSpecialEffectMusic(musicPath_thunder);
+                thundering = true;
+            }
+            dark = false;
         }
     }
 
@@ -1288,7 +1324,7 @@ public:
         settextstyle(40, 0, _T("宋体"));
         settextcolor(BLACK);
         putimage(0, MINER_Y + MINER_H, &img_brick);
-        if (storming) {
+        if (dark) {
             setfillcolor(BLACK);
             fillrectangle(0, MINER_Y + MINER_H + 10, WID, HEI);
         } else {
@@ -1321,7 +1357,26 @@ public:
 
     void init() {
         CGame::initGameObjects();
-        playBackgroundMusic(musicPath_background_normal);
+        switch (stage) {
+            case 11: // Quicksand start
+                outputStatus("Quicksand start, so the game is a little bit harder");
+                break;
+            case 12: // Faster settling rate
+                outputStatus("Faster settling rate");
+                break;
+            case 13: // The quicksand becomes soft, so heavier objects will settle first
+                outputStatus("The quicksand becomes soft, so heavier objects will settle first");
+                break;
+            case 14: // The quicksand becomes soft
+                outputStatus("The quicksand becomes soft");
+                break;
+            case 15: // Golds will fall quickly, while lighter stones fall very slowly
+                outputStatus("Golds will fall quickly, while lighter stones fall very slowly");
+                break;
+            default:
+                break;
+        }
+        playBackgroundMusic(musicPath_background_quicksand);
     }
 
     void update() {
@@ -1329,8 +1384,32 @@ public:
         if (lastRemainTime != m_clock.remainTime()) {
             lastRemainTime = m_clock.remainTime();
             for (GameObject& obj : m_gameObjects) {
-                if (obj.getRy() + obj.getRadius() < HEI && !obj.retracted()) {
-                    obj.submerge(obj.getRadius() / 75 + 1);
+                if (obj.getRy() + obj.getRadius() < HEI && &obj != m_focusedGameObject) {
+                    switch (stage) {
+                        case 11: // Quicksand start
+                            obj.submerge(1);
+                            break;
+                        case 12: // Faster settling rate
+                            obj.submerge(2);
+                            break;
+                        case 13: // The quicksand becomes soft, so heavier objects will settle first
+                            obj.submerge(obj.getRadius() / 100 + 2);
+                            break;
+                        case 14: // The quicksand becomes soft
+                            obj.submerge(obj.getRadius() / 75 + 2);
+                            break;
+                        case 15: // Golds will fall quickly, while lighter stones fall very slowly
+                            if (obj.getType() == GameObjectType::GOLD) {
+                                obj.submerge(obj.getRadius() / 30);
+                            } else if (obj.getType() == GameObjectType::ROCK) {
+                                obj.submerge(obj.getRadius() / 100 + 1);
+                            } else {
+                                obj.submerge(1);
+                            }
+                            break;
+                        default:
+                            break;
+                    }
                 }
             }
         }
@@ -1347,14 +1426,52 @@ public:
 
     void init() {
         CGame::initGameObjects();
-        m_hook.setmageticmode();
+        switch (stage) {
+            case 16: // Magnetic start
+                outputStatus("Magnetic start, so the game is a little bit harder");
+                break;
+            case 17: // More game objects and stronger magnetic force
+                outputStatus("More game objects and stronger magnetic force");
+                break;
+            case 18: // Stronger magnetic force
+                outputStatus("Stronger magnetic force");
+                break;
+            case 19: // The magnetic force starts to change over time, so collect the side target as soon
+                outputStatus("The magnetic force starts to change over time, so collect the side target as soon");
+                break;
+            case 20: // Stronger magnetic force
+                outputStatus("Stronger magnetic force");
+                break;
+            default:
+                break;
+        }
         playBackgroundMusic(musicPath_background_normal);
     }
 
     void update() {
+        double magnetic_index = 10 - m_clock.remainTime() / 10;
         CGame::update();
         if (m_hook.isGoingOut()) {
-            m_hook.magnetic(WID / 2, HEI, 100);
+            switch (stage)
+            {
+            case 16:
+                m_hook.magnetic(HOOK_X, HEI, 0.5); // Magnetic start
+                break;
+            case 17:
+                m_hook.magnetic(HOOK_X, HEI, 1); // More game objects and stronger magnetic force
+                break;
+            case 18:
+                m_hook.magnetic(HOOK_X, HEI, magnetic_index / 2); // Stronger magnetic force
+                break;
+            case 19:
+                m_hook.magnetic(HOOK_X, HEI, magnetic_index); // The magnetic force starts to change over time, so collect the side target as soon
+                break;
+            case 20:
+                m_hook.magnetic(HOOK_X, HEI, magnetic_index * 1.5); // Stronger magnetic force
+                break;
+            default:
+                break;
+            }
         }
     }
 
@@ -1407,14 +1524,13 @@ public:
         settextcolor(BLACK);
         m_button_continue.draw();
         m_button_quit.draw();
-        FlushBatchDraw();
     }
 private:
     void callbackContinue() {
         setGameScene(GameSceneType::GAME);
     }
     void callbackQuit() {
-        setGameScene(GameSceneType::OVER);
+        setGameScene(GameSceneType::NULLSCENE);
     }
 };
 
@@ -1444,16 +1560,58 @@ public:
         settextcolor(BLACK);
         m_button_retry.draw();
         m_button_quit.draw();
-        FlushBatchDraw();
     }
 private:
     void callbackRetry() {
         setGameScene(GameSceneType::GAME);
     }
     void callbackQuit() {
-        setGameScene(GameSceneType::OVER);
+        setGameScene(GameSceneType::NULLSCENE);
     }
 };
+
+class COver : public CScene {
+private:
+    std::string overText = 
+"Game master planner: 24071121
+Numerical planning: 24071121
+Plot Planning: 24071121
+
+Art Director: 24071121
+Original artist: 24071121
+Special Effects Artist: 24071121
+UI Designer: 24071121
+
+Technical Director: 24071121
+Game engine Developer: 24071121
+
+Game Test Supervisor: 24071121
+Function Test Engineer: 24071121";
+    CButton m_button_quit;
+public:
+    COver(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene),
+        m_button_quit(0.75 * WID, 0.85 * HEI, 0.2 * WID, 0.1 * HEI, "Quit", std::bind(&CLose::callbackQuit, this)) {}
+    void update() override {
+        MOUSEMSG m;
+        if (MouseHit()) {
+            m = GetMouseMsg();
+            m_button_quit.simulateMouseMSG(m);
+        }
+    }
+    void render() override {
+        cleardevice();
+        setfillcolor(BLACK)
+        setbkmode(TRANSPARENT);
+        fillrectangle(0, 0, WID, HEI);
+        settextstyle(40, 0, _T("宋体"));
+        settextcolor(WHITE);
+        m_button_quit.draw();
+    }
+private:
+    void callbackQuit() {
+        setGameScene(GameSceneType::NULLSCENE);
+    }
+}
 
 class Game {
 private:
