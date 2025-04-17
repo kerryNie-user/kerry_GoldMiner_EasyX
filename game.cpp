@@ -23,7 +23,7 @@ LinkedList<std::string> storedPassword;
 LinkedList<int> storedStage;
 std::string username = "kerry";
 std::string password = "kerry";
-int stage = 15;
+int stage = 20;
 
 std::string filePath = "users.txt";
 std::string imgPath_startup = "res/img_startup.jpg";
@@ -97,6 +97,7 @@ IMAGE mask_bomb;
 IMAGE img_explosive;
 IMAGE mask_explosive;
 IMAGE img_game_end;
+IMAGE img_game_over;
 
 const int SLEEP_TIME = 10;
 const int LENGTH_INDEX = 400;
@@ -1527,7 +1528,11 @@ public:
     }
 private:
     void callbackContinue() {
-        setGameScene(GameSceneType::GAME);
+        if (stage >= 20) {
+            setGameScene(GameSceneType::OVER);
+        } else {
+            setGameScene(GameSceneType::GAME);
+        }
     }
     void callbackQuit() {
         setGameScene(GameSceneType::NULLSCENE);
@@ -1572,37 +1577,28 @@ private:
 
 class COver : public CScene {
 private:
-    std::string overText = 
-"Game master planner: 24071121
-Numerical planning: 24071121
-Plot Planning: 24071121
-
-Art Director: 24071121
-Original artist: 24071121
-Special Effects Artist: 24071121
-UI Designer: 24071121
-
-Technical Director: 24071121
-Game engine Developer: 24071121
-
-Game Test Supervisor: 24071121
-Function Test Engineer: 24071121";
+    int y = 0;
     CButton m_button_quit;
+
 public:
     COver(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene),
-        m_button_quit(0.75 * WID, 0.85 * HEI, 0.2 * WID, 0.1 * HEI, "Quit", std::bind(&CLose::callbackQuit, this)) {}
+        m_button_quit(0.75 * WID, 0.85 * HEI, 0.2 * WID, 0.1 * HEI, "Quit", std::bind(&COver::callbackQuit, this)) {
+            std::cout << WID << " " << img_game_over.getwidth() << std::endl;
+        }
     void update() override {
         MOUSEMSG m;
         if (MouseHit()) {
             m = GetMouseMsg();
             m_button_quit.simulateMouseMSG(m);
         }
+        if (y > HEI - 1700) {
+            --y;
+        }
     }
     void render() override {
         cleardevice();
-        setfillcolor(BLACK)
         setbkmode(TRANSPARENT);
-        fillrectangle(0, 0, WID, HEI);
+        putimage(0, y, &img_game_over);
         settextstyle(40, 0, _T("宋体"));
         settextcolor(WHITE);
         m_button_quit.draw();
@@ -1611,7 +1607,7 @@ private:
     void callbackQuit() {
         setGameScene(GameSceneType::NULLSCENE);
     }
-}
+};
 
 class Game {
 private:
@@ -1622,14 +1618,16 @@ private:
     CGame* m_game = nullptr;
     CWin m_win;
     CLose m_lose;
+    COver m_over;
 
 public:
-    Game(): m_game_scene(GameSceneType::GAME),
+    Game(): m_game_scene(GameSceneType::OVER),
             m_menu([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_signin([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_login([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_win([this](GameSceneType scene) { this->m_game_scene = scene; }),
-            m_lose([this](GameSceneType scene) { this->m_game_scene = scene; }) {
+            m_lose([this](GameSceneType scene) { this->m_game_scene = scene; }),
+            m_over([this](GameSceneType scene) { this->m_game_scene = scene; }) {
                 loadTEXT();
                 loadIMAGE();
             }
@@ -1654,7 +1652,6 @@ public:
                         break;
                     case GameSceneType::GAME:
                         if (m_game == nullptr) {
-                            std::cout << "Stage: " << stage << " ";
                             if (stage < 6) {
                                 m_game = CGameFactory::createGame(GameStageType::NORMAL, [this](GameSceneType scene) { this->m_game_scene = scene; });
                                 std::cout << "Normal" << std::endl;
@@ -1678,6 +1675,11 @@ public:
                     case GameSceneType::LOSE:
                         m_lose.update();
                         m_lose.render();
+                        m_game = nullptr;
+                        break;
+                    case GameSceneType::OVER:
+                        m_over.update();
+                        m_over.render();
                         m_game = nullptr;
                         break;
                     default:
@@ -1748,6 +1750,7 @@ private:
         loadimage(&img_bomb, imgPath_bomb.c_str(), BOMB_W, BOMB_H, true);
         loadimage(&mask_bomb, maskPath_bomb.c_str(), BOMB_W, BOMB_H, true);
         loadimage(&img_game_end, imgPath_game_end.c_str(), WID, HEI, true);
+        loadimage(&img_game_over, imgPath_game_over.c_str(), WID, 1684 * WID / 1180, true);
     }
 
     bool proofreadIMAGE() {
@@ -1828,6 +1831,9 @@ private:
             return false;
         } else if (img_game_end.getwidth() != WID || img_game_end.getheight() != HEI) {
             std::cerr << "Failed to load img_game_end!" << std::endl;
+            return false;
+        } else if (img_game_over.getwidth() != WID || img_game_over.getheight() != 1684 * WID / 1180) {
+            std::cerr << "Failed to load img_game_over!" << std::endl;
             return false;
         } else {
             return true;
