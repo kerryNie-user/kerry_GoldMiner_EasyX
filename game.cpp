@@ -101,8 +101,6 @@ IMAGE img_game_win;
 IMAGE img_game_lose;
 IMAGE img_game_over;
 
-std::cout
-
 const int SLEEP_TIME = 10;
 const int LENGTH_INDEX = 400;
 const int WID = 3 * LENGTH_INDEX;
