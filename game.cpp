@@ -23,7 +23,7 @@ LinkedList<std::string> storedPassword;
 LinkedList<int> storedStage;
 std::string username = "kerry";
 std::string password = "kerry";
-int stage = 20;
+int stage = 1;
 
 std::string filePath = "users.txt";
 std::string imgPath_startup = "res/img_startup.jpg";
@@ -100,6 +100,8 @@ IMAGE mask_explosive;
 IMAGE img_game_win;
 IMAGE img_game_lose;
 IMAGE img_game_over;
+
+std::cout
 
 const int SLEEP_TIME = 10;
 const int LENGTH_INDEX = 400;
@@ -1457,10 +1459,12 @@ class CWin : public CScene {
 private:
     CButton m_button_continue;
     CButton m_button_quit;
+
 public:
     CWin(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene),
         m_button_continue(0.665 * WID, 0.51375 * HEI, 0.29 * WID, 0.15 * HEI, "Continue", std::bind(&CWin::callbackContinue, this)),
         m_button_quit(0.665 * WID, 0.70875 * HEI, 0.29 * WID, 0.15 * HEI, "Quit", std::bind(&CWin::callbackQuit, this)) {}
+
     void update() override {
         MOUSEMSG m;
         if (MouseHit()) {
@@ -1469,15 +1473,15 @@ public:
             m_button_quit.simulateMouseMSG(m);
         }
     }
+
     void render() override {
         cleardevice();
         putimage(0, 0, &img_game_win);
         setbkmode(TRANSPARENT);
         settextstyle(40, 0, _T("宋体"));
         settextcolor(BLACK);
-        // m_button_continue.draw();
-        // m_button_quit.draw();
     }
+
 private:
     void callbackContinue() {
         if (stage >= 20) {
@@ -1486,6 +1490,7 @@ private:
             setGameScene(GameSceneType::GAME);
         }
     }
+    
     void callbackQuit() {
         setGameScene(GameSceneType::NULLSCENE);
     }
@@ -1499,6 +1504,7 @@ public:
     CLose(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene),
         m_button_retry(0.6725 * WID, 0.12625 * HEI, 0.29 * WID, 0.15 * HEI, "Retry", std::bind(&CLose::callbackRetry, this)),
         m_button_quit(0.6725 * WID, 0.3 * HEI, 0.29 * WID, 0.15 * HEI, "Quit", std::bind(&CLose::callbackQuit, this)) {}
+
     void update() override {
         MOUSEMSG m;
         if (MouseHit()) {
@@ -1507,6 +1513,7 @@ public:
             m_button_quit.simulateMouseMSG(m);
         }
     }
+
     void render() override {
         cleardevice();
         putimage(0, 0, &img_game_lose);
@@ -1516,10 +1523,12 @@ public:
         // m_button_retry.draw();
         // m_button_quit.draw();
     }
+
 private:
     void callbackRetry() {
         setGameScene(GameSceneType::GAME);
     }
+
     void callbackQuit() {
         setGameScene(GameSceneType::NULLSCENE);
     }
@@ -1532,9 +1541,8 @@ private:
 
 public:
     COver(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene),
-        m_button_quit(0.75 * WID, 0.85 * HEI, 0.2 * WID, 0.1 * HEI, "Quit", std::bind(&COver::callbackQuit, this)) {
-            std::cout << WID << " " << img_game_over.getwidth() << std::endl;
-        }
+        m_button_quit(0.75 * WID, 0.85 * HEI, 0.2 * WID, 0.1 * HEI, "Quit", std::bind(&COver::callbackQuit, this)) {}
+
     void update() override {
         MOUSEMSG m;
         if (MouseHit()) {
@@ -1545,6 +1553,7 @@ public:
             --y;
         }
     }
+
     void render() override {
         cleardevice();
         setbkmode(TRANSPARENT);
@@ -1553,6 +1562,7 @@ public:
         settextcolor(WHITE);
         m_button_quit.draw();
     }
+
 private:
     void callbackQuit() {
         setGameScene(GameSceneType::NULLSCENE);
@@ -1604,7 +1614,6 @@ public:
                         if (m_game == nullptr) {
                             if (stage < 6) {
                                 m_game = CGameFactory::createGame(GameStageType::NORMAL, [this](GameSceneType scene) { this->m_game_scene = scene; });
-                                std::cout << "Normal" << std::endl;
                             } else if (stage < 11) {
                                 m_game = CGameFactory::createGame(GameStageType::STORMY, [this](GameSceneType scene) { this->m_game_scene = scene; });
                             } else if (stage < 16) {
