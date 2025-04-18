@@ -53,7 +53,8 @@ std::string imgPath_bomb = "res/img_bomb.jpg";
 std::string maskPath_bomb = "res/img_bomb_mask.jpg";
 std::string imgPath_explosive = "res/img_explosive.jpg";
 std::string maskPath_explosive = "res/img_explosive.jpg";
-std::string imgPath_game_end = "res/img_game_end.png";
+std::string imgPath_game_win = "res/img_game_win.jpg";
+std::string imgPath_game_lose = "res/img_game_lose.jpg";
 std::string imgPath_game_over = "res/img_game_over.jpeg";
 
 std::string musicPath_background_normal = "res/music_background_normal.mp3";
@@ -96,7 +97,8 @@ IMAGE img_bomb;
 IMAGE mask_bomb;
 IMAGE img_explosive;
 IMAGE mask_explosive;
-IMAGE img_game_end;
+IMAGE img_game_win;
+IMAGE img_game_lose;
 IMAGE img_game_over;
 
 const int SLEEP_TIME = 10;
@@ -160,6 +162,7 @@ enum class GameStageType {
 
 class Clock {
 private:
+    int x, y, w, h;
     int start;
     int total;
     int current;
@@ -174,14 +177,14 @@ public:
         start = 0;
         this->total = total;
         gameContinue = true;
-        display = "Time: 0";
+        display = "0";
     }
 
     void draw() {
         int textWidth = textwidth(display.c_str());
         int textHeight = textheight(display.c_str());
-        int textX = (WID - textWidth - WID / 50);
-        int textY = (50 - textHeight) / 2;
+        int textX = 0.91 * WID - textWidth / 2;
+        int textY = 0.015 * HEI;
         outtextxy(textX, textY, display.c_str());
     }
 
@@ -198,8 +201,8 @@ public:
             }
         }
         std::ostringstream oss;
-        oss << std::setfill('0') << std::setw(2) << remain;
-        display = "Time: " + oss.str();
+        oss << remain;
+        display = oss.str();
     }
 
     bool isContinue() {
@@ -212,7 +215,7 @@ public:
 };
 
 class Score {
-    private:
+private:
     int score;
     int goal;
     std::string displayScore;
@@ -224,8 +227,8 @@ public:
     void init(int goal) {
         score = 0;
         this->goal = goal;
-        displayScore = "Score: 0";
-        displayGoal = "Goal: " + std::to_string(goal);
+        displayScore = std::to_string(score);
+        displayGoal = std::to_string(goal);
     }
 
     void draw() {
@@ -233,16 +236,17 @@ public:
         int textHeight1 = textheight(displayScore.c_str());
         int textWidth2 = textwidth(displayGoal.c_str());
         int textHeight2 = textheight(displayGoal.c_str());
-        int textX = WID / 50;
-        int textY1 = (50 - textHeight1) / 2;
-        int textY2 = (50 + textHeight2) / 2;
-        outtextxy(textX, textY1, displayScore.c_str());
-        outtextxy(textX, textY2, displayGoal.c_str());
+        int textX1 = 0.135 * WID - textWidth1 / 2;
+        int textX2 = 0.135 * WID - textWidth2 / 2;
+        int textY1 = 0.015 * HEI;
+        int textY2 = 0.065 * HEI;
+        outtextxy(textX1, textY1, displayScore.c_str());
+        outtextxy(textX2, textY2, displayGoal.c_str());
     }
 
     void get(int newScore) {
         score += newScore;
-        displayScore = "Score: " + std::to_string(score);
+        displayScore = std::to_string(score);
     }
 
     bool reachGoal() {
@@ -260,7 +264,7 @@ public:
 
     void init(int stage) {
         this->stage = stage;
-        display = "Stage: " + std::to_string(stage);
+        display = std::to_string(stage);
     }
 
     int getStage() {
@@ -270,8 +274,8 @@ public:
     void draw() {
         int textWidth = textwidth(display.c_str());
         int textHeight = textheight(display.c_str());
-        int textX = (WID - textWidth - WID / 50);
-        int textY = (50 + textHeight) / 2;
+        int textX = 0.91 * WID - textWidth / 2;
+        int textY = 0.065 * HEI;
         outtextxy(textX, textY, display.c_str());
     }
 };
@@ -293,8 +297,11 @@ protected:
 
 public:
     void draw() {
-        setfillcolor(isFocused ? RGB(200, 200, 200) : WHITE);
-        fillrectangle(x, y, x + w, y + h);
+        if (isFocused) {
+            setfillcolor(LIGHTGRAY);
+            setlinestyle(PS_NULL);
+            fillrectangle(x + 3, y + 3, x + w - 2, y + h - 3);
+        }
         setbkmode(TRANSPARENT);
         settextstyle(40, 0, _T("宋体"));
         settextcolor(BLACK);
@@ -350,42 +357,22 @@ public:
         return text;
     }
 
-    void simulateMouseClick(int mouseX, int mouseY) {
-        if (isMouseInButton(mouseX, mouseY)) {
-            isFocused = true;
-            handleEvent();
-        }
-    }
-
     void simulateMouseMSG(MOUSEMSG m) {
-        if (isMouseInButton(m.x, m.y)) {
-            if (m.uMsg == WM_LBUTTONDOWN) {
+        if (m.uMsg == WM_LBUTTONDOWN) {
+            if (isMouseInButton(m.x, m.y)) {
                 isFocused = true;
-                handleEvent();
+            } else {
+                isFocused = false;
             }
         }
     }
 
-private:
-    void handleEvent() {
-        while (true) {
-            MOUSEMSG m;
-            if (MouseHit()) {
-                m = GetMouseMsg();
-                if (m.uMsg == WM_LBUTTONDOWN) {
-                    if (isMouseInButton(m.x, m.y)) {
-                        isFocused = true;
-                    } else {
-                        isFocused = false;
-                        break;
-                    }
-                }
-            }
+    void simulateKeyboardMSG() {
+        if (isFocused) {
             if (kbhit()) {
                 wchar_t ch = _getwch();
                 if (ch == L'\r') {
                     isFocused = false;
-                    break;
                 } else if (ch == L'\b') {
                     if (!text.empty()) {
                         text.pop_back();
@@ -394,10 +381,7 @@ private:
                     text += ch;
                 }
             }
-            draw();
-            FlushBatchDraw();
         }
-        Sleep(SLEEP_TIME);
     }
 };
 
@@ -829,8 +813,8 @@ private:
 
 public:
     CMenu(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene),
-        m_button_signin(0.1 * WID, 0.7 * HEI, 0.3 * WID, 0.08 * HEI, "signin", std::bind(&CMenu::callbackSignin, this)), 
-        m_button_login(0.6 * WID, 0.7 * HEI, 0.3 * WID, 0.08 * HEI, "login", std::bind(&CMenu::callbackLogin, this)) {}
+        m_button_signin(0.654 * WID, 0.5 * HEI, 0.3 * WID, 0.1625 * HEI, "signin", std::bind(&CMenu::callbackSignin, this)), 
+        m_button_login(0.025 * WID, 0.5 * HEI, 0.3 * WID, 0.1625 * HEI, "login", std::bind(&CMenu::callbackLogin, this)) {}
 
     void update() override{
         MOUSEMSG m;
@@ -844,8 +828,6 @@ public:
     void render() override {
         cleardevice();
         putimage(0, 0, &img_startup);
-        m_button_login.draw();
-        m_button_signin.draw();
     }
 
 private:
@@ -869,87 +851,72 @@ private:
 
 public:
     CSignin(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), confirm(false), 
-        m_input_username(0.34 * WID, 0.44 * HEI, 0.48 * WID, 0.12 * HEI), 
-        m_input_password(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI), 
-        m_input_confirm(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI), 
-        m_button_ok(0.8 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "OK", std::bind(&CSignin::callbackOk, this)), 
-        m_button_cancel(0.04 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "CANCEL", std::bind(&CSignin::callbackCancel, this)) {}
+        m_input_username(0.3575 * WID, 0.2887 * HEI, 0.381 * WID, 0.0825 * HEI), 
+        m_input_password(0.3575 * WID, 0.4013 * HEI, 0.381 * WID, 0.0825 * HEI), 
+        m_input_confirm(0.3575 * WID, 0.5138 * HEI, 0.381 * WID, 0.0825 * HEI), 
+        m_button_ok(0.5225 * WID, 0.655 * HEI, 0.2175 * WID, 0.1125 * HEI, "OK", std::bind(&CSignin::callbackOk, this)), 
+        m_button_cancel(0.2808 * WID, 0.655 * HEI, 0.2175 * WID, 0.1125 * HEI, "CANCEL", std::bind(&CSignin::callbackCancel, this)) {}
 
     void update() override {
         MOUSEMSG m;
         if (MouseHit()) {
             m = GetMouseMsg();
-            if (confirm) {
-                m_input_confirm.simulateMouseMSG(m);
-            } else {
-                m_input_username.simulateMouseMSG(m);
-                m_input_password.simulateMouseMSG(m);
-            }
+            m_input_username.simulateMouseMSG(m);
+            m_input_password.simulateMouseMSG(m);
+            m_input_confirm.simulateMouseMSG(m);
             m_button_ok.simulateMouseMSG(m);
             m_button_cancel.simulateMouseMSG(m);
         }
+        m_input_username.simulateKeyboardMSG();
+        m_input_password.simulateKeyboardMSG();
+        m_input_confirm.simulateKeyboardMSG();
     }
 
     void render() override {
         cleardevice();
         putimage(0, 0, &img_signin);
         setbkmode(TRANSPARENT);
-        setfillcolor(RGB(224, 243, 225));
-        fillrectangle(0.12 * WID, 0.37 * HEI, 0.88 * WID, 0.8 * HEI);
         settextstyle(40, 0, _T("宋体"));
         settextcolor(BLACK);
         m_input_username.draw();
-        if (confirm) {
-            m_input_confirm.draw();
-        } else {
-            m_input_password.draw();
-        }
-        m_button_ok.draw();
-        m_button_cancel.draw();
+        m_input_password.draw();
+        m_input_confirm.draw();
     }
 
 private:
     void callbackOk() {
-        if (confirm) {
-            std::string passwordOld = m_input_password.getInputText();
-            std::string passwordNew = m_input_confirm.getInputText();
-            if (passwordOld == passwordNew) {
-                stage = 1;
-                storedUsername.push_back(username);
-                storedPassword.push_back(password);
-                storedStage.push_back(stage);
-                outputStatus("Welcome in...");
-                setGameScene(GameSceneType::GAME);
-            } else {
-                outputStatus("Password incorrect");
-            }
+        username = m_input_username.getInputText();
+        password = m_input_password.getInputText();
+        if (username.empty()) {
+            outputStatus("Username cannot be empty");
+            return;
+        } else if (password.empty()) {
+            outputStatus("Password cannot be empty");
+            return;
+        } else if (m_input_confirm.getInputText().empty()) {
+            outputStatus("Confirm password cannot be empty");
+            return;
+        } else if (password != m_input_confirm.getInputText()) {
+            outputStatus("The passwords are different twice");
+            return;
         } else {
-            username = m_input_username.getInputText();
-            password = m_input_password.getInputText();
-            if (username.empty()) {
-                outputStatus("Username cannot be empty");
-                return;
-            } else if (password.empty()) {
-                outputStatus("Password cannot be empty");
-                return;
-            }
             for (std::string user : storedUsername) {
                 if (username == user) {
                     outputStatus("Username has been used");
                     return;
                 }
             }
-            outputStatus("Please confirm your password");
-            confirm = true;
         }
+        stage = 1;
+        storedUsername.push_back(username);
+        storedPassword.push_back(password);
+        storedStage.push_back(stage);
+        outputStatus("Welcome in...");
+        setGameScene(GameSceneType::GAME);
     }
 
     void callbackCancel() {
-        if (confirm) {
-            confirm = false;
-        } else {
-            setGameScene(GameSceneType::MENU);
-        }
+        setGameScene(GameSceneType::MENU);
     }
 };
 
@@ -961,10 +928,10 @@ private:
     CButton m_button_cancel;
 public:
     CLogin(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene),
-        m_button_ok(0.8 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "OK", std::bind(&CLogin::callbackOk, this)),
-        m_button_cancel(0.04 * WID, 0.8 * HEI, 0.16 * WID, 0.15 * HEI, "CANCEL", std::bind(&CLogin::callbackCancel, this)),
-        m_input_username(0.34 * WID, 0.44 * HEI, 0.48 * WID, 0.12 * HEI),
-        m_input_password(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI) {}
+        m_button_ok(0.5108 * WID, 0.6025 * HEI, 0.2175 * WID, 0.1125 * HEI, "OK", std::bind(&CLogin::callbackOk, this)),
+        m_button_cancel(0.2692 * WID, 0.6025 * HEI, 0.2175 * WID, 0.1125 * HEI, "CANCEL", std::bind(&CLogin::callbackCancel, this)),
+        m_input_username(0.3675 * WID, 0.3675 * HEI, 0.3816 * WID, 0.0825 * HEI),
+        m_input_password(0.3675 * WID, 0.48125 * HEI, 0.3816 * WID, 0.0825 * HEI) {}
 
     void update() override {
         MOUSEMSG m;
@@ -975,20 +942,18 @@ public:
             m_button_ok.simulateMouseMSG(m);
             m_button_cancel.simulateMouseMSG(m);
         }
+        m_input_username.simulateKeyboardMSG();
+        m_input_password.simulateKeyboardMSG();
     }
 
     void render() override {
         cleardevice();
-        putimage(0, 0, &img_signin);
+        putimage(0, 0, &img_login);
         setbkmode(TRANSPARENT);
-        setfillcolor(RGB(224, 243, 225));
-        fillrectangle(0.12 * WID, 0.37 * HEI, 0.88 * WID, 0.8 * HEI);
         settextstyle(40, 0, _T("宋体"));
         settextcolor(BLACK);
         m_input_username.draw();
         m_input_password.draw();
-        m_button_ok.draw();
-        m_button_cancel.draw();
     }
 
 private:
@@ -1015,11 +980,6 @@ int goal = 0;
 IMAGE img_null;
 GameObject nullObject(GameObjectType::GOLD, 0, 0, GoldRadiusType::BIG, img_null, img_null);
 
-// stage 1 ~ 5 normal levels
-// stage 6 ~ 10 stormy levels
-// stage 11 ~ 15 quicksand levels
-// stage 16 ~ 20 magnetic levels
-
 class CGame : public CScene {
 protected:
     Clock m_clock;
@@ -1032,7 +992,7 @@ protected:
     GameObject* m_focusedGameObject = &nullObject;
 
     CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), m_clock(), m_score(), m_stage(), m_miner(), m_hook(), m_bomb(),
-        m_button_quit(0.65 * WID, (MINER_Y + MINER_H - 0.08 * HEI) / 2, 0.12 * WID, 0.08 * HEI, "Quit", std::bind(&CGame::callbackQuit, this)) {}
+        m_button_quit(0.638 * WID, 0.01375 * HEI, 0.14 * WID, 0.07 * HEI, "Quit", std::bind(&CGame::callbackQuit, this)) {}
     
 public:
     void initGameObjects() {
@@ -1059,23 +1019,18 @@ public:
         setbkmode(TRANSPARENT);
         settextstyle(40, 0, _T("宋体"));
         settextcolor(BLACK);
-        putimage(0, MINER_Y + MINER_H + 10, &img_game_background);
-        putimage(0, MINER_Y + MINER_H, &img_brick);
+        putimage(0, 0, &img_game_background);
         for (CBomb& bomb : m_bombs) {
             bomb.draw();
         }
         for (GameObject& obj : m_gameObjects) {
             obj.draw();
         }
-        if (m_focusedGameObject != &nullObject) {
-            m_focusedGameObject->draw();
-        }
         m_clock.draw();
         m_score.draw();
         m_stage.draw();
         m_miner.draw();
         m_hook.draw();
-        m_button_quit.draw();
     }
 
 private:
@@ -1152,7 +1107,7 @@ private:
 
     void init_m_GameObjects() {
         m_gameObjects.clear();
-        int num_index = tanh(stage);
+        int num_index = tanh(stage % 5 + 1);
         int num_gold = 3 + 8 * num_index + rand() % 3;
         int num_rock = 3 + 3 * num_index + rand() % 2;
         int num_diamond = num_index + rand() % 2;
@@ -1345,7 +1300,6 @@ public:
         m_stage.draw();
         m_miner.draw();
         m_hook.draw();
-        m_button_quit.draw();
     }
 };
 
@@ -1505,8 +1459,8 @@ private:
     CButton m_button_quit;
 public:
     CWin(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene),
-        m_button_continue(0.34 * WID, 0.44 * HEI, 0.48 * WID, 0.12 * HEI, "Continue", std::bind(&CWin::callbackContinue, this)),
-        m_button_quit(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI, "Quit", std::bind(&CWin::callbackQuit, this)) {}
+        m_button_continue(0.665 * WID, 0.51375 * HEI, 0.29 * WID, 0.15 * HEI, "Continue", std::bind(&CWin::callbackContinue, this)),
+        m_button_quit(0.665 * WID, 0.70875 * HEI, 0.29 * WID, 0.15 * HEI, "Quit", std::bind(&CWin::callbackQuit, this)) {}
     void update() override {
         MOUSEMSG m;
         if (MouseHit()) {
@@ -1517,14 +1471,12 @@ public:
     }
     void render() override {
         cleardevice();
-        putimage(0, 0, &img_game_end);
+        putimage(0, 0, &img_game_win);
         setbkmode(TRANSPARENT);
-        setfillcolor(RGB(224, 243, 225));
-        fillrectangle(0.12 * WID, 0.37 * HEI, 0.88 * WID, 0.8 * HEI);
         settextstyle(40, 0, _T("宋体"));
         settextcolor(BLACK);
-        m_button_continue.draw();
-        m_button_quit.draw();
+        // m_button_continue.draw();
+        // m_button_quit.draw();
     }
 private:
     void callbackContinue() {
@@ -1545,8 +1497,8 @@ private:
     CButton m_button_quit;
 public:
     CLose(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene),
-        m_button_retry(0.34 * WID, 0.44 * HEI, 0.48 * WID, 0.12 * HEI, "Retry", std::bind(&CLose::callbackRetry, this)),
-        m_button_quit(0.34 * WID, 0.61 * HEI, 0.48 * WID, 0.12 * HEI, "Quit", std::bind(&CLose::callbackQuit, this)) {}
+        m_button_retry(0.6725 * WID, 0.12625 * HEI, 0.29 * WID, 0.15 * HEI, "Retry", std::bind(&CLose::callbackRetry, this)),
+        m_button_quit(0.6725 * WID, 0.3 * HEI, 0.29 * WID, 0.15 * HEI, "Quit", std::bind(&CLose::callbackQuit, this)) {}
     void update() override {
         MOUSEMSG m;
         if (MouseHit()) {
@@ -1557,14 +1509,12 @@ public:
     }
     void render() override {
         cleardevice();
-        putimage(0, 0, &img_game_end);
+        putimage(0, 0, &img_game_lose);
         setbkmode(TRANSPARENT);
-        setfillcolor(RGB(224, 243, 225));
-        fillrectangle(0.12 * WID, 0.37 * HEI, 0.88 * WID, 0.8 * HEI);
         settextstyle(40, 0, _T("宋体"));
         settextcolor(BLACK);
-        m_button_retry.draw();
-        m_button_quit.draw();
+        // m_button_retry.draw();
+        // m_button_quit.draw();
     }
 private:
     void callbackRetry() {
@@ -1621,7 +1571,7 @@ private:
     COver m_over;
 
 public:
-    Game(): m_game_scene(GameSceneType::OVER),
+    Game(): m_game_scene(GameSceneType::GAME),
             m_menu([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_signin([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_login([this](GameSceneType scene) { this->m_game_scene = scene; }),
@@ -1749,7 +1699,8 @@ private:
         loadimage(&mask_hook, maskPath_hook.c_str(), 35, 20, true);
         loadimage(&img_bomb, imgPath_bomb.c_str(), BOMB_W, BOMB_H, true);
         loadimage(&mask_bomb, maskPath_bomb.c_str(), BOMB_W, BOMB_H, true);
-        loadimage(&img_game_end, imgPath_game_end.c_str(), WID, HEI, true);
+        loadimage(&img_game_win, imgPath_game_win.c_str(), WID, HEI, true);
+        loadimage(&img_game_lose, imgPath_game_lose.c_str(), WID, HEI, true);
         loadimage(&img_game_over, imgPath_game_over.c_str(), WID, 1684 * WID / 1180, true);
     }
 
@@ -1829,11 +1780,11 @@ private:
         } else if (mask_bomb.getwidth() != BOMB_W || mask_bomb.getheight() != BOMB_H) {
             std::cerr << "Failed to load mask_bomb!" << std::endl;
             return false;
-        } else if (img_game_end.getwidth() != WID || img_game_end.getheight() != HEI) {
-            std::cerr << "Failed to load img_game_end!" << std::endl;
+        } else if (img_game_win.getwidth() != WID || img_game_win.getheight() != HEI) {
+            std::cerr << "Failed to load img_game_win!" << std::endl;
             return false;
-        } else if (img_game_over.getwidth() != WID || img_game_over.getheight() != 1684 * WID / 1180) {
-            std::cerr << "Failed to load img_game_over!" << std::endl;
+        } else if (img_game_lose.getwidth() != WID || img_game_lose.getheight() != HEI) {
+            std::cerr << "Failed to load img_game_lose!" << std::endl;
             return false;
         } else {
             return true;
