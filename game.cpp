@@ -23,7 +23,7 @@ LinkedList<std::string> storedPassword;
 LinkedList<int> storedStage;
 std::string username = "kerry";
 std::string password = "kerry";
-int stage = 1;
+int stage = 10;
 
 std::string filePath = "users.txt";
 std::string imgPath_startup = "res/img_startup.jpg";
@@ -69,6 +69,7 @@ std::string musicPath_hook_gold = "res/music_hook_gold.mp3";
 std::string musicPath_hook_rock = "res/music_hook_rock.mp3";
 std::string musicPath_transition = "res/music_transition.mp3";
 std::string musicPath_thunder = "res/music_thunder.mp3";
+std::string musicPath_countdown = "res/music_countdown.mp3";
 
 IMAGE img_startup;
 IMAGE img_signin;
@@ -78,7 +79,6 @@ IMAGE img_goldminer_1;
 IMAGE mask_goldminer_1;
 IMAGE img_goldminer_2;
 IMAGE mask_goldminer_2;
-IMAGE img_brick;
 IMAGE img_gold_big;
 IMAGE mask_gold_big;
 IMAGE img_gold_mid;
@@ -106,13 +106,13 @@ const int LENGTH_INDEX = 400;
 const int WID = 3 * LENGTH_INDEX;
 const int HEI = 2 * LENGTH_INDEX;
 const int HOOK_LENGTH = 30;
-const int HOOK_SPEED = SLEEP_TIME * 7 / 10;
+const int HOOK_SPEED = SLEEP_TIME * 0.7;
 const int MINER_X = (WID - 90) / 2;
 const int MINER_Y = 10;
 const int MINER_W = 90;
-const int MINER_H = 70;
-const int HOOK_X = MINER_X + MINER_W * 4 / 10;
-const int HOOK_Y = MINER_Y + MINER_H * 6 / 10;
+const int MINER_H = 90;
+const int HOOK_X = MINER_X + MINER_W * 0.18;
+const int HOOK_Y = MINER_Y + MINER_H * 0.6;
 const int BOMB_W = 15;
 const int BOMB_H = 30;
 const int GAME_TIME = 99;
@@ -289,13 +289,13 @@ protected:
     bool isReleased = false;
     std::string text;
 
+public:
     CControl(int x, int y, int w, int h, const std::string& text) : x(x), y(y), w(w), h(h), text(text) {}
 
     bool isMouseInButton(int mouseX, int mouseY) {
         return mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
     }
 
-public:
     void draw() {
         if (isFocused) {
             setfillcolor(LIGHTGRAY);
@@ -782,15 +782,20 @@ public:
 protected:
     void outputStatus(std::string text) {
         setbkmode(TRANSPARENT);
-        settextcolor(BLACK);
         setbkcolor(WHITE);
-        settextstyle(40, 0, _T("宋体"));
-        fillrectangle(0.12 * WID, 0.37 * HEI, 0.88 * WID, 0.8 * HEI);
+        settextstyle(40, 0, _T("黑体"));
+        settextcolor(BLACK);
         int textX = 0.5 * WID - (textwidth(_T(text).c_str())) / 2;
         int textY = 0.59 * HEI - (textheight(_T(text).c_str())) / 2;
+        fillrectangle(textX, textY, textX + textwidth(_T(text).c_str()), textY + textheight(_T(text).c_str()));
         outtextxy(textX, textY, _T(text).c_str());
         FlushBatchDraw();
-        Sleep(1000);
+        while(true) {
+            MOUSEMSG m = GetMouseMsg();
+            if (m.uMsg == WM_LBUTTONDOWN) {
+                break;
+            }
+        }
     }
 
     void playBackgroundMusic(std::string& music) {
@@ -799,10 +804,14 @@ protected:
         mciSendString("play bkmusic repeat", NULL, 0, NULL);
     }
 
+    void endBackgroundMusic() {
+        mciSendString("close bkmusic", NULL, 0, NULL);
+    }
+
     void playSpecialEffectMusic(std::string& music) {
-        mciSendString("close specialEffect", NULL, 0, NULL);
-        mciSendString(("open " + music + " alias specialEffect").c_str(), NULL, 0, NULL);
-        mciSendString("play specialEffect", NULL, 0, NULL);
+        mciSendString(("close " + music).c_str(), NULL, 0, NULL);
+        mciSendString(("open " + music + " alias " + music).c_str(), NULL, 0, NULL);
+        mciSendString(("play " + music).c_str(), NULL, 0, NULL);
     }
 };
 
@@ -990,13 +999,14 @@ protected:
     CBomb m_bomb;
     CButton m_button_quit;
     GameObject* m_focusedGameObject = &nullObject;
+    bool countdown = false;
 
     CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), m_clock(), m_score(), m_stage(), m_miner(), m_hook(), m_bomb(),
         m_button_quit(0.638 * WID, 0.01375 * HEI, 0.14 * WID, 0.07 * HEI, "Quit", std::bind(&CGame::callbackQuit, this)) {}
     
 public:
-    void initGameObjects() {
-        goal = 1000 + (int)(6 * std::sqrt(stage % 5 + 1)) * 100;
+    virtual void init() {
+        goal = 1000 + ((stage - 1) % 5 + 1) * 500;
         m_gameObjects.clear();
         m_stage.init(stage);
         m_clock.init(GAME_TIME);
@@ -1006,6 +1016,7 @@ public:
         m_bomb.init(img_bomb, mask_bomb);
         init_m_GameObjects();
         init_m_Boombs();
+        countdown = false;
     }
 
     void update() override {
@@ -1037,10 +1048,13 @@ private:
     void updateWithInput() {
         if (MouseHit()) {
             MOUSEMSG m = GetMouseMsg();
+            m_button_quit.simulateMouseMSG(m);
             if (m.uMsg == WM_LBUTTONDOWN) {
-                m_hook.move();
-                m_miner.work();
-                playSpecialEffectMusic(musicPath_hook_goingOut);
+                if (!m_button_quit.isMouseInButton(m.x, m.y)) {
+                    m_hook.move();
+                    m_miner.work();
+                    playSpecialEffectMusic(musicPath_hook_goingOut);
+                }
             } else if (m.uMsg == WM_RBUTTONDOWN) {
                 if (m_hook.isGoingBack() && m_bombs.size() > 0) {
                     m_hook.setSpeed(HOOK_SPEED);
@@ -1050,12 +1064,12 @@ private:
                     }
                 }
             }
-            m_button_quit.simulateMouseMSG(m);
         }
     }
 
     void updateWithoutInput() {
         if (!m_clock.isContinue()) {
+            endBackgroundMusic();
             if (m_score.reachGoal()) {
                 outputStatus("GOOD!");
                 ++stage;
@@ -1065,6 +1079,7 @@ private:
                 setGameScene(GameSceneType::LOSE);
             }
         } else if (m_gameObjects.empty()) {
+            endBackgroundMusic();
             outputStatus("AMAZING!!!");
             ++stage;
             setGameScene(GameSceneType::WIN);
@@ -1102,6 +1117,10 @@ private:
                     m_focusedGameObject->move(m_hook.getAngle());
                 }
             }
+        }
+        if (!countdown && m_clock.remainTime() == 5) {
+            playSpecialEffectMusic(musicPath_countdown);
+            countdown = true;
         }
     }
 
@@ -1189,7 +1208,6 @@ private:
 
     void callbackQuit() {
         setGameScene(GameSceneType::NULLSCENE);
-        outputStatus("GoodBye!");
     }
 };
 
@@ -1198,7 +1216,7 @@ public:
     CGameNormal(const std::function<void(GameSceneType)>& setGameScene) : CGame(setGameScene) {}
 
     void init() {
-        CGame::initGameObjects();
+        CGame::init();
         outputStatus("This is just the beginning, so only higher and higher goals");
         playBackgroundMusic(musicPath_background_normal);
     }
@@ -1221,10 +1239,10 @@ private:
     bool thundering = false;
 
 public:
-    CGameStormy(const std::function<void(GameSceneType)>& setGameScene) : CGame(setGameScene) {}
+    CGameStormy(const std::function<void(GameSceneType)>& setGameScene) : CGame(setGameScene) {void init();}
 
     void init() {
-        CGame::initGameObjects();
+        CGame::init();
         switch (stage) {
             case 6: // Stormy start
                 stormyTime = 2;
@@ -1273,32 +1291,15 @@ public:
         }
     }
 
-    void render() override {
-        cleardevice();
-        setbkcolor(WHITE);
-        setbkmode(TRANSPARENT);
-        settextstyle(40, 0, _T("宋体"));
-        settextcolor(BLACK);
-        putimage(0, MINER_Y + MINER_H, &img_brick);
+    void render() override {    
+        CGame::render();
         if (dark) {
             setfillcolor(BLACK);
             fillrectangle(0, MINER_Y + MINER_H + 10, WID, HEI);
-        } else {
-            putimage(0, MINER_Y + MINER_H + 10, &img_game_background);
-            for (GameObject& obj : m_gameObjects) {
-                obj.draw();
-            }
-        }
-        if (m_focusedGameObject != &nullObject) {
-            m_focusedGameObject->draw();
         }
         for (CBomb& bomb : m_bombs) {
             bomb.draw();
         }
-        m_clock.draw();
-        m_score.draw();
-        m_stage.draw();
-        m_miner.draw();
         m_hook.draw();
     }
 };
@@ -1311,7 +1312,7 @@ public:
     CGameQuicksand(const std::function<void(GameSceneType)>& setGameScene) : CGame(setGameScene) {}
 
     void init() {
-        CGame::initGameObjects();
+        CGame::init();
         switch (stage) {
             case 11: // Quicksand start
                 outputStatus("Quicksand start, so the game is a little bit harder");
@@ -1380,7 +1381,7 @@ public:
     CGameMagnetic(const std::function<void(GameSceneType)>& setGameScene) : CGame(setGameScene) {}
 
     void init() {
-        CGame::initGameObjects();
+        CGame::init();
         switch (stage) {
             case 16: // Magnetic start
                 outputStatus("Magnetic start, so the game is a little bit harder");
@@ -1535,17 +1536,16 @@ private:
 class COver : public CScene {
 private:
     int y = 0;
-    CButton m_button_quit;
 
 public:
-    COver(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene),
-        m_button_quit(0.75 * WID, 0.85 * HEI, 0.2 * WID, 0.1 * HEI, "Quit", std::bind(&COver::callbackQuit, this)) {}
+    COver(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene) {}
 
     void update() override {
-        MOUSEMSG m;
         if (MouseHit()) {
-            m = GetMouseMsg();
-            m_button_quit.simulateMouseMSG(m);
+            MOUSEMSG m = GetMouseMsg();
+            if (m.uMsg == WM_LBUTTONDOWN) {
+                setGameScene(GameSceneType::NULLSCENE);
+            }
         }
         if (y > HEI - 1700) {
             --y;
@@ -1554,17 +1554,8 @@ public:
 
     void render() override {
         cleardevice();
-        setbkmode(TRANSPARENT);
         putimage(0, y, &img_game_over);
-        settextstyle(40, 0, _T("宋体"));
-        settextcolor(WHITE);
-        m_button_quit.draw();
-    }
-
-private:
-    void callbackQuit() {
-        setGameScene(GameSceneType::NULLSCENE);
-    }
+    }    
 };
 
 class Game {
@@ -1579,7 +1570,7 @@ private:
     COver m_over;
 
 public:
-    Game(): m_game_scene(GameSceneType::GAME),
+    Game(): m_game_scene(GameSceneType::OVER),
             m_menu([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_signin([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_login([this](GameSceneType scene) { this->m_game_scene = scene; }),
@@ -1619,7 +1610,7 @@ public:
                             } else if (stage < 21){
                                 m_game = CGameFactory::createGame(GameStageType::MAGNETIC, [this](GameSceneType scene) { this->m_game_scene = scene; });
                             }
-                            m_game->initGameObjects();
+                            m_game->init();
                         }
                         m_game->update();
                         m_game->render();
@@ -1689,7 +1680,6 @@ private:
         loadimage(&mask_goldminer_1, maskPath_goldminer_1.c_str(), MINER_W, MINER_H, true);        
         loadimage(&img_goldminer_2, imgPath_goldminer_2.c_str(), MINER_W, MINER_H, true);        
         loadimage(&mask_goldminer_2, maskPath_goldminer_2.c_str(), MINER_W, MINER_H, true);
-        loadimage(&img_brick, imgPath_brick.c_str(), WID, 10, true);
         loadimage(&img_gold_big, imgPath_gold_big.c_str(), 2 * GoldRadiusType::BIG, 2 * GoldRadiusType::BIG, true);
         loadimage(&mask_gold_big, maskPath_gold_big.c_str(), 2 * GoldRadiusType::BIG, 2 * GoldRadiusType::BIG, true);
         loadimage(&img_gold_mid, imgPath_gold_mid.c_str(), 2 * GoldRadiusType::MID, 2 * GoldRadiusType::MID, true);
@@ -1735,9 +1725,6 @@ private:
             return false;
         } else if (mask_goldminer_2.getwidth() != MINER_W || mask_goldminer_2.getheight() != MINER_H) {
             std::cerr << "Failed to load mask_goldminer_2!" << std::endl;
-            return false;
-        } else if (img_brick.getwidth() != WID || img_brick.getheight() != 10) {
-            std::cerr << "Failed to load img_brick!" << std::endl;
             return false;
         } else if (img_gold_big.getwidth() != 2 * GoldRadiusType::BIG || img_gold_big.getheight() != 2 * GoldRadiusType::BIG) {
             std::cerr << "Failed to load img_gold_big!" << std::endl;
