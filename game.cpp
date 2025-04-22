@@ -47,8 +47,8 @@ std::string imgPath_rock_small = "res/img_rock_small.jpg";
 std::string maskPath_rock_small = "res/img_rock_small_mask.jpg";
 std::string imgPath_diamond = "res/img_diamond.jpg";
 std::string maskPath_diamond = "res/img_diamond_mask.jpg";
-std::string imgPath_hook = "res/img_hook.jpg";
-std::string maskPath_hook = "res/img_hook_mask.jpg";
+std::string imgPath_hook = "res/img_hook.bmp";
+std::string maskPath_hook = "res/img_hook_mask.bmp";
 std::string imgPath_bomb = "res/img_bomb.jpg";
 std::string maskPath_bomb = "res/img_bomb_mask.jpg";
 std::string imgPath_explosive = "res/img_explosive.jpg";
@@ -1570,7 +1570,7 @@ private:
     COver m_over;
 
 public:
-    Game(): m_game_scene(GameSceneType::OVER),
+    Game(): m_game_scene(GameSceneType::GAME),
             m_menu([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_signin([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_login([this](GameSceneType scene) { this->m_game_scene = scene; }),
@@ -1692,8 +1692,8 @@ private:
         loadimage(&mask_rock_small, maskPath_rock_small.c_str(), 2 * RockRadiusType::SMALL, 2 * RockRadiusType::SMALL, true);
         loadimage(&img_diamond, imgPath_diamond.c_str(), 2 * TreasureRadiusType::DIAMOND, 2 * TreasureRadiusType::DIAMOND, true);
         loadimage(&mask_diamond, maskPath_diamond.c_str(), 2 * TreasureRadiusType::DIAMOND, 2 * TreasureRadiusType::DIAMOND, true);
-        loadimage(&img_hook, imgPath_hook.c_str(), 35, 20, true);
-        loadimage(&mask_hook, maskPath_hook.c_str(), 35, 20, true);
+        loadimage(&img_hook, imgPath_hook.c_str(), 36, 20, true);
+        loadimage(&mask_hook, maskPath_hook.c_str(), 36, 20, true);
         loadimage(&img_bomb, imgPath_bomb.c_str(), BOMB_W, BOMB_H, true);
         loadimage(&mask_bomb, maskPath_bomb.c_str(), BOMB_W, BOMB_H, true);
         loadimage(&img_game_win, imgPath_game_win.c_str(), WID, HEI, true);
@@ -1762,10 +1762,10 @@ private:
         } else if (mask_diamond.getwidth() != 2 * TreasureRadiusType::DIAMOND || mask_diamond.getheight() != 2 * TreasureRadiusType::DIAMOND) {
             std::cerr << "Failed to load mask_diamond!" << std::endl;
             return false;
-        } else if (img_hook.getwidth() != 35 || img_hook.getheight() != 20) {
+        } else if (img_hook.getwidth() != 36 || img_hook.getheight() != 20) {
             std::cerr << "Failed to load img_hook!" << std::endl;
             return false;
-        } else if (mask_hook.getwidth() != 35 || mask_hook.getheight() != 20) {
+        } else if (mask_hook.getwidth() != 36 || mask_hook.getheight() != 20) {
             std::cerr << "Failed to load mask_hook!" << std::endl;
             return false;
         } else if (img_bomb.getwidth() != BOMB_W || img_bomb.getheight() != BOMB_H) {
