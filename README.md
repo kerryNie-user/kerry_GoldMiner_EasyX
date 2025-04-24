@@ -7,10 +7,6 @@ This game is based on EasyX library for Windows system development, using visual
 2.Configure the EasyX library: Add the EasyX library file correctly to the visual studio Code development environment. For details, please refer to the EasyX official documents or related tutorials.
 3.Set character encoding: In the project Settings, ensure that the character encoding format is set to a multi-byte string to ensure that the text information in the game can be displayed normally.
 
-Author information:
-1.Name: kerry_Nie
-2.Contact: (I don't want to tell you now, but maybe I will change my mind sometimes)(^~^)
-
 If you encounter any problems during use, or have any suggestions or feedback on the game, please contact the author through the above methods.
 
 
@@ -23,8 +19,4 @@ If you encounter any problems during use, or have any suggestions or feedback on
 2.配置EasyX库：将EasyX库文件正确添加到visual studio Code开发环境中。详细信息请参考EasyX官方文档或相关教程。
 3.设置字符编码：在项目设置中，确保字符编码格式设置为多字节字符串，以确保游戏中的文本信息能够正常显示。
 
-作者信息：
-1.名称:kerry_Nie
-2.联系人：（我现在不想告诉你，但说不定呢）（^~^）
-
-如果您在使用过程中遇到任何问题，或对游戏有任何建议或反馈，请通过上述方式与作者联系。
+如果您在使用过程中遇到任何问题，或对游戏有任何建议或反馈，请与作者联系。
