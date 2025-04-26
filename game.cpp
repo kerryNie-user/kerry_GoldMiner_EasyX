@@ -18,12 +18,18 @@
 
 #pragma comment(lib, "Winmm.lib")
 
+time_t getCurrentTimeInMilliseconds() {
+    auto now = std::chrono::system_clock::now();
+    auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
+    return now_ms.time_since_epoch().count();
+}
+
 LinkedList<std::string> storedUsername;
 LinkedList<std::string> storedPassword;
 LinkedList<int> storedStage;
 std::string username = "kerry";
 std::string password = "kerry";
-int stage = 10;
+int stage = 9;
 
 std::string filePath = "users.txt";
 std::string imgPath_startup = "res/img_startup.jpg";
@@ -51,11 +57,12 @@ std::string imgPath_hook = "res/img_hook.bmp";
 std::string maskPath_hook = "res/img_hook_mask.bmp";
 std::string imgPath_bomb = "res/img_bomb.jpg";
 std::string maskPath_bomb = "res/img_bomb_mask.jpg";
-std::string imgPath_explosive = "res/img_explosive.jpg";
-std::string maskPath_explosive = "res/img_explosive.jpg";
 std::string imgPath_game_win = "res/img_game_win.jpg";
 std::string imgPath_game_lose = "res/img_game_lose.jpg";
 std::string imgPath_game_over = "res/img_game_over.jpeg";
+
+LinkedList<std::string> imgPath_explosive;
+LinkedList<std::string> maskPath_explosive;
 
 std::string musicPath_background_normal = "res/music_background_normal.mp3";
 std::string musicPath_background_stormy = "res/music_background_stormy.mp3";
@@ -95,11 +102,25 @@ IMAGE img_hook;
 IMAGE mask_hook;
 IMAGE img_bomb;
 IMAGE mask_bomb;
-IMAGE img_explosive;
-IMAGE mask_explosive;
 IMAGE img_game_win;
 IMAGE img_game_lose;
 IMAGE img_game_over;
+
+LinkedList<IMAGE> img_explosive;
+LinkedList<IMAGE> mask_explosive;
+
+void setImageExplosivePath() {
+    for (int i = 0; i < 12; ++i) {
+        std::ostringstream oss;
+        oss << std::setfill('0') << std::setw(2) << i + 1;
+        std::string twoDigit = oss.str();
+    
+        std::string imgPath ="res/explosion/explosion_" + twoDigit + ".jpg";
+        std::string maskPath = "res/explosion/explosion_" + twoDigit + "_mask.jpg";
+        imgPath_explosive.push_back(imgPath);
+        maskPath_explosive.push_back(maskPath);
+    }
+}
 
 const int SLEEP_TIME = 10;
 const int LENGTH_INDEX = 400;
@@ -116,6 +137,7 @@ const int HOOK_Y = MINER_Y + MINER_H * 0.6;
 const int BOMB_W = 15;
 const int BOMB_H = 30;
 const int GAME_TIME = 99;
+const std::time_t EXPLOSION_TIME = 1000;
 
 struct GoldRadiusType {
     static constexpr int BIG = 75;
@@ -481,6 +503,8 @@ public:
 
     void draw() {
         setcolor(BLACK);
+        setlinecolor(BLACK);
+        setfillcolor(BLACK);
         setlinestyle(PS_SOLID, 2);
         line(x, y, endX, endY);
         if (rotate) {
@@ -621,6 +645,8 @@ protected:
     int speed;
     int score;
     bool isBombed = false;
+    int explosedIndex = -1;
+    std::time_t explosedTime;
     IMAGE img;
     IMAGE mask;
 
@@ -658,7 +684,13 @@ public:
     }
 
     void draw() {
-        putimgwithmask(img, mask, x, y);
+        if (isBombed && explosedIndex != -1) {
+            int explosedX = x + radius - img_explosive[explosedIndex].getwidth() / 2;
+            int explosedY = y + radius - img_explosive[explosedIndex].getwidth() / 2;;
+            putimgwithmask(img_explosive[explosedIndex], mask_explosive[explosedIndex], explosedX, explosedY);
+        } else if (explosedIndex == -1) {
+            putimgwithmask(img, mask, x, y);
+        }
     }
 
     void move(int moveangle) {
@@ -671,7 +703,20 @@ public:
     }
         
     void bomb() {
+        explosedTime = getCurrentTimeInMilliseconds();
         isBombed = true;
+    }
+
+    void explosing() {
+        std::time_t currentTime = getCurrentTimeInMilliseconds();
+        std::time_t elapsedTime = currentTime - explosedTime;
+        if (elapsedTime < EXPLOSION_TIME) {
+            if (explosedIndex < img_explosive.size()) {
+                explosedIndex = img_explosive.size() * elapsedTime / EXPLOSION_TIME;
+            }
+        } else {
+            isBombed = false;
+        }
     }
     
     bool isHooked(int hookX, int hookY) {
@@ -762,6 +807,107 @@ public:
                 return Treasure(x, y, radiusType, img, mask);
             default:
                 throw std::invalid_argument("Invalid GameObjectType");
+        }
+    }
+};
+
+typedef struct {
+    int x, y;
+    int length;
+    int speed;
+} Raindrop;
+
+class Rain {
+private:
+    LinkedList<Raindrop> drops;
+
+public:
+    Rain() {}
+
+    void init(int count) {
+        for (int i = 0; i < count; ++i) {
+            Raindrop drop;
+            drop.x = rand() % WID;
+            drop.y = rand() % HEI;
+            drop.length = 10 + rand() % 20;
+            drop.speed = 5 + rand() % 5;
+            drops.push_back(drop);
+        }
+    }
+
+    void draw() {
+        setlinecolor(0xAAAAAA);
+        setfillcolor(0x888888);
+        setbkmode(TRANSPARENT);
+        setrop2(R2_MERGEPEN);
+        setlinestyle(PS_SOLID, 2);
+        for (Raindrop& drop : drops) {
+            line(drop.x, drop.y, drop.x, drop.y + drop.length);
+        }
+        setrop2(R2_COPYPEN);
+        setcolor(BLACK);
+    }
+
+    void update() {
+        for (Raindrop& drop : drops) {
+            drop.y += drop.speed;
+            if (drop.y > HEI) {
+                drop.y = -drop.length;
+                drop.x = rand() % WID;
+            }
+        }
+    }
+};
+
+class Lightning {
+private:
+    LinkedList<POINT> points;
+    bool isActive;
+    int duration;
+
+public:
+    Lightning() {}
+
+    void init(int duration) {
+        this->duration = duration * 1000 / SLEEP_TIME;
+        isActive = false;
+    }
+
+    void generateLightning() {
+        points.clear();
+        isActive = true;
+        POINT start = { rand() % WID, 0 };
+        points.push_back(start);
+        for (int i = 0; i < 10; ++i) {
+            POINT next = { points.back().x + (rand() % 40 - 20), points.back().y + (rand() % 50 + 20) };
+            if (next.y > HEI) {
+                break;
+            } else if (next.x < 0) {
+                next.x = 0;
+            } else if (next.x > WID) {
+                next.x = WID;
+            }
+            points.push_back(next);
+        }
+    }
+    
+    void draw() {
+        if (isActive) {
+            setlinestyle(PS_SOLID, 5);
+            setlinecolor(WHITE);
+            for (size_t i = 1; i < points.size(); ++i) {
+                line(points[i - 1].x, points[i - 1].y, points[i].x, points[i].y);
+            }
+            setlinestyle(PS_SOLID, 2);
+        }
+    }
+    
+    void update() {
+        if (isActive) {
+            --duration;
+            if (duration <= 0) {
+                isActive = false;
+            }
         }
     }
 };
@@ -999,6 +1145,7 @@ protected:
     CBomb m_bomb;
     CButton m_button_quit;
     GameObject* m_focusedGameObject = &nullObject;
+    GameObject* m_explosedGameObject = &nullObject;
     bool countdown = false;
 
     CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), m_clock(), m_score(), m_stage(), m_miner(), m_hook(), m_bomb(),
@@ -1016,7 +1163,6 @@ public:
         m_bomb.init(img_bomb, mask_bomb);
         init_m_GameObjects();
         init_m_Boombs();
-        countdown = false;
     }
 
     void update() override {
@@ -1042,6 +1188,12 @@ public:
         m_stage.draw();
         m_miner.draw();
         m_hook.draw();
+        if (m_focusedGameObject != &nullObject) {
+            m_focusedGameObject->draw();
+        }
+        if (m_explosedGameObject != &nullObject) {
+            m_explosedGameObject->draw();
+        }
     }
 
 private:
@@ -1104,7 +1256,7 @@ private:
             } else {
                 if (m_focusedGameObject->bombed()) {
                     m_bombs.erase(m_bombs[m_bombs.size() - 1]);
-                    m_gameObjects.erase(*m_focusedGameObject);
+                    m_explosedGameObject = m_focusedGameObject;
                     m_focusedGameObject = &nullObject;
                 } else {
                     if (m_hook.isStop()) {
@@ -1116,6 +1268,14 @@ private:
                     }
                     m_focusedGameObject->move(m_hook.getAngle());
                 }
+            }
+        }
+        if (m_explosedGameObject != &nullObject) {
+            if (m_explosedGameObject->bombed()) {
+                m_explosedGameObject->explosing();
+            } else {
+                m_gameObjects.erase(*m_explosedGameObject);
+                m_explosedGameObject = &nullObject;
             }
         }
         if (!countdown && m_clock.remainTime() == 5) {
@@ -1232,6 +1392,8 @@ public:
 
 class CGameStormy : public CGame {
 private:
+    Rain rain;
+    Lightning lightning;
     int startTime = 3;
     int stormyTime = 1;
     int stormyInterval = 6;
@@ -1243,6 +1405,7 @@ public:
 
     void init() {
         CGame::init();
+        rain.init(500);
         switch (stage) {
             case 6: // Stormy start
                 stormyTime = 2;
@@ -1273,11 +1436,14 @@ public:
             default:
                 break;
         }
+        lightning.init(stormyTime * 1000 / SLEEP_TIME);
         playBackgroundMusic(musicPath_background_stormy);
     }
 
     void update() {
         CGame::update();
+        rain.update();
+        lightning.update();
         if (m_clock.remainTime() + startTime < GAME_TIME && 
             (m_clock.remainTime() + startTime) % (stormyTime + stormyInterval) > stormyTime) {
             thundering = false;
@@ -1286,21 +1452,28 @@ public:
             if (thundering == false) {
                 playSpecialEffectMusic(musicPath_thunder);
                 thundering = true;
+                lightning.generateLightning();
             }
             dark = false;
         }
     }
 
-    void render() override {    
+    void render() override {
         CGame::render();
         if (dark) {
             setfillcolor(BLACK);
             fillrectangle(0, MINER_Y + MINER_H + 10, WID, HEI);
+        } else {
+            lightning.draw();
         }
         for (CBomb& bomb : m_bombs) {
             bomb.draw();
         }
         m_hook.draw();
+        if (m_explosedGameObject != &nullObject) {
+            m_explosedGameObject->draw();
+        }
+        rain.draw();
     }
 };
 
@@ -1577,6 +1750,7 @@ public:
             m_win([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_lose([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_over([this](GameSceneType scene) { this->m_game_scene = scene; }) {
+                setImageExplosivePath();
                 loadTEXT();
                 loadIMAGE();
             }
@@ -1699,6 +1873,14 @@ private:
         loadimage(&img_game_win, imgPath_game_win.c_str(), WID, HEI, true);
         loadimage(&img_game_lose, imgPath_game_lose.c_str(), WID, HEI, true);
         loadimage(&img_game_over, imgPath_game_over.c_str(), WID, 1684 * WID / 1180, true);
+        for (int i = 0; i < 12; ++i) {
+            IMAGE img;
+            IMAGE mask;
+            loadimage(&img, imgPath_explosive[i].c_str());
+            loadimage(&mask, maskPath_explosive[i].c_str());
+            img_explosive.push_back(img);
+            mask_explosive.push_back(mask);
+        }
     }
 
     bool proofreadIMAGE() {
@@ -1780,9 +1962,21 @@ private:
         } else if (img_game_lose.getwidth() != WID || img_game_lose.getheight() != HEI) {
             std::cerr << "Failed to load img_game_lose!" << std::endl;
             return false;
+        } else if (img_explosive.size() !=12 || mask_explosive.size() != 12) {
+            std::cerr << "Failed to load img_explosive or mask_explosive!" << std::endl;
+            return false;
         } else {
-            return true;
+            for (int i = 0; i < 12; ++i) {
+                if (img_explosive[i].getwidth() != 191 || img_explosive[i].getheight() != 191) {
+                    std::cerr << "Failed to load img_explosive!" << std::endl;
+                    return false;
+                } else if (mask_explosive[i].getwidth() != 191 || mask_explosive[i].getheight() != 191) {
+                    std::cerr << "Failed to load mask_explosive!" << std::endl;
+                    return false;
+                }
+            }
         }
+        return true;
     }
 
     void writeTEXT() {

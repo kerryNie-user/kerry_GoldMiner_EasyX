@@ -92,9 +92,17 @@ public:
         ++size_;
     }
 
-    int size() const { return size_; }
+    T back() {
+        return tail->data;
+    }
 
-    bool empty() const { return size_ == 0; }
+    int size() const {
+        return size_;
+    }
+
+    bool empty() const {
+        return size_ == 0;
+    }
 
     void clear() {
         while (head != nullptr) {
