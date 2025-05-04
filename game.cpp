@@ -14,22 +14,37 @@
 #include <graphics.h>
 #include <memory>
 #include <iomanip>
-#include "linklist.hpp"
 
-#pragma comment(lib, "Winmm.lib")
+#include "linklist.hpp"  // My linked list with almost all of the functions vector has
 
+#pragma comment(lib, "Winmm.lib")  // For PlaySound
+
+/**
+ * @brief Get the current time in milliseconds since epoch.
+ * @return The current time in milliseconds.
+ */
 time_t getCurrentTimeInMilliseconds() {
     auto now = std::chrono::system_clock::now();
     auto now_ms = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
     return now_ms.time_since_epoch().count();
 }
 
-LinkedList<std::string> storedUsername;
-LinkedList<std::string> storedPassword;
-LinkedList<int> storedStage;
-std::string username = "kerry";
-std::string password = "kerry";
-int stage = 9;
+/**
+ * @brief Convert degrees to radians.
+ * @param angleDegrees The angle in degrees.
+ * @return The angle in radians.
+ */
+inline double degreesToRadians(double angleDegrees) {
+    return angleDegrees * M_PI / 180.0;
+}
+
+LinkedList<std::string> storedUsername;  // All the usernames in the file
+LinkedList<std::string> storedPassword;  // All the passwords in the file
+LinkedList<int> storedStage;             // All the stages in the file
+
+std::string username = "kerry";  // Focused user's username
+std::string password = "kerry";  // Focused user's password
+int stage = 9;                   // Focused user's stage
 
 std::string filePath = "users.txt";
 std::string imgPath_startup = "res/img_startup.jpg";
@@ -61,14 +76,17 @@ std::string imgPath_game_win = "res/img_game_win.jpg";
 std::string imgPath_game_lose = "res/img_game_lose.jpg";
 std::string imgPath_game_over = "res/img_game_over.jpeg";
 
+// Explosion effect frame animation
 LinkedList<std::string> imgPath_explosive;
 LinkedList<std::string> maskPath_explosive;
 
+// Background music paths
 std::string musicPath_background_normal = "res/music_background_normal.mp3";
 std::string musicPath_background_stormy = "res/music_background_stormy.mp3";
 std::string musicPath_background_quicksand = "res/music_background_quicksand.mp3";
 std::string musicPath_background_magnetic = "res/music_background_magnetic.mp3";
 
+// Background sound effects
 std::string musicPath_bomb_explosive = "res/music_bomb_explosive.mp3";
 std::string musicPath_hook_goingOut = "res/music_hook_goingOut.mp3";
 std::string musicPath_hook_treasure = "res/music_hook_treasure.mp3";
@@ -106,38 +124,26 @@ IMAGE img_game_win;
 IMAGE img_game_lose;
 IMAGE img_game_over;
 
+// Explosion effect frame animation picture
 LinkedList<IMAGE> img_explosive;
 LinkedList<IMAGE> mask_explosive;
 
-void setImageExplosivePath() {
-    for (int i = 0; i < 12; ++i) {
-        std::ostringstream oss;
-        oss << std::setfill('0') << std::setw(2) << i + 1;
-        std::string twoDigit = oss.str();
-    
-        std::string imgPath ="res/explosion/explosion_" + twoDigit + ".jpg";
-        std::string maskPath = "res/explosion/explosion_" + twoDigit + "_mask.jpg";
-        imgPath_explosive.push_back(imgPath);
-        maskPath_explosive.push_back(maskPath);
-    }
-}
-
-const int SLEEP_TIME = 10;
-const int LENGTH_INDEX = 400;
+const int SLEEP_TIME = 10;  // Sleep time in milliseconds every frame
+const int LENGTH_INDEX = 400;  // Length index for the game window, defining the width and height of the game window
 const int WID = 3 * LENGTH_INDEX;
 const int HEI = 2 * LENGTH_INDEX;
-const int HOOK_LENGTH = 30;
-const int HOOK_SPEED = SLEEP_TIME * 0.7;
 const int MINER_X = (WID - 90) / 2;
 const int MINER_Y = 10;
 const int MINER_W = 90;
 const int MINER_H = 90;
 const int HOOK_X = MINER_X + MINER_W * 0.18;
 const int HOOK_Y = MINER_Y + MINER_H * 0.6;
+const int HOOK_LENGTH = 30;  // Length of the line from the miner to the hook
+const int HOOK_SPEED = SLEEP_TIME * 0.7;  // Speed of the hook when going out
 const int BOMB_W = 15;
 const int BOMB_H = 30;
 const int GAME_TIME = 99;
-const std::time_t EXPLOSION_TIME = 1000;
+const std::time_t EXPLOSION_TIME = 1000;  // Burst frame animation duration
 
 struct GoldRadiusType {
     static constexpr int BIG = 75;
@@ -180,28 +186,32 @@ enum class GameStageType {
     MAGNETIC
 };
 
-#define degreesToRadians(angleDegrees) ((angleDegrees) * M_PI / 180.0)
-
 class Clock {
 private:
-    int x, y, w, h;
-    int start;
-    int total;
-    int current;
-    int remain;
-    bool gameContinue;
-    std::string display;
+    int x, y, w, h;  // Coordinates and dimensions of the clock
+    int start;  // Timestamp for game start
+    int total;  // Total game time
+    int remain;  // Remaining time
+    bool gameContinue;  // Flag to check if the game is still ongoing
+    std::string display;  // Display remaining time
 
 public:
     Clock () {}
 
+    /**
+     * @brief Initialize the clock with the total game time.
+     * @param total Total game time in seconds. 
+     */
     void init(int total) {
-        start = 0;
+        start = clock();
         this->total = total;
         gameContinue = true;
         display = "0";
     }
 
+    /**
+     * @brief Draw the clock on the existed clock panel.
+     */
     void draw() {
         int textWidth = textwidth(display.c_str());
         int textHeight = textheight(display.c_str());
@@ -210,27 +220,33 @@ public:
         outtextxy(textX, textY, display.c_str());
     }
 
+    /**
+     * @brief Update the clock and check if the game is still ongoing.
+     */
     void update () {
-        current = clock();
-        if (start == 0) {
-            start = current;
-        } else {
-            int elapsed = (current - start) / CLOCKS_PER_SEC;
-            remain = total - elapsed;
-            if (remain <= 0) {
-                remain = 0;
-                gameContinue = false;
-            }
+        int elapsed = (clock() - start) / CLOCKS_PER_SEC;
+        remain = total - elapsed;
+        if (remain <= 0) {
+            remain = 0;
+            gameContinue = false;
         }
         std::ostringstream oss;
         oss << remain;
         display = oss.str();
     }
 
+    /**
+     * @brief Check if the game is still ongoing.
+     * @return True if the game is still ongoing, false otherwise.
+     */
     bool isContinue() {
         return gameContinue;
     }
 
+    /**
+     * @brief Get the remaining time.
+     * @return Remaining time in seconds.
+     */
     int remainTime() {
         return remain;
     }
@@ -238,14 +254,18 @@ public:
 
 class Score {
 private:
-    int score;
-    int goal;
-    std::string displayScore;
-    std::string displayGoal;
+    int score;  // The score player has earned
+    int goal;   // The score player needs to reach to win the game
+    std::string displayScore;  // The score displayed
+    std::string displayGoal;   // The goal displayed
 
 public:
     Score () {}
 
+    /**
+     * @brief Initialize the score with the goal.
+     * @param goal The score player needs to reach to win the game.
+     */
     void init(int goal) {
         score = 0;
         this->goal = goal;
@@ -253,6 +273,9 @@ public:
         displayGoal = std::to_string(goal);
     }
 
+    /**
+     * @brief Draw the score and goal on the existed score and goal panel.
+     */
     void draw() {
         int textWidth1 = textwidth(displayScore.c_str());
         int textHeight1 = textheight(displayScore.c_str());
@@ -266,39 +289,66 @@ public:
         outtextxy(textX2, textY2, displayGoal.c_str());
     }
 
+    /**
+     * @brief The player gets some score.
+     * @param newScore The score the player gets.
+     */
     void get(int newScore) {
         score += newScore;
         displayScore = std::to_string(score);
     }
 
+    /**
+     * @brief Check if the player has reached the goal.
+     * @return True if the player has reached the goal, false otherwise.
+     */
     bool reachGoal() {
         return score >= goal;
+    }
+
+    /**
+     * @brief Get the current score.
+     * @return The current score.
+     */
+    int getGoal() {
+        return goal;
     }
 };
 
 class Stage {
 private:
-    int stage;
-    std::string display;
+    int stage;  // The current stage of the game
+    std::string display;  // The stage displayed
 
 public:
     Stage () {}
 
+    /**
+     * @brief Initialize the stage with the current stage.
+     * @param stage The current stage of the game.
+     */
     void init(int stage) {
         this->stage = stage;
         display = std::to_string(stage);
     }
 
-    int getStage() {
-        return stage;
-    }
-
+    /**
+     * @brief Draw the stage on the existed stage panel.
+     */
     void draw() {
         int textWidth = textwidth(display.c_str());
         int textHeight = textheight(display.c_str());
         int textX = 0.91 * WID - textWidth / 2;
         int textY = 0.065 * HEI;
         outtextxy(textX, textY, display.c_str());
+    }
+
+    /**
+     * @brief Get the current stage.
+     * @return The current stage.
+     */
+    int getStage() {
+        return stage;
     }
 };
 
@@ -605,7 +655,7 @@ public:
 
     double getAngle() const {
         return angle;
-    }
+    }   
 };
 
 class CBomb : public CObject {
@@ -820,6 +870,7 @@ typedef struct {
 class Rain {
 private:
     LinkedList<Raindrop> drops;
+    bool lightningActive = true;
 
 public:
     Rain() {}
@@ -836,15 +887,17 @@ public:
     }
 
     void draw() {
-        setlinecolor(0xAAAAAA);
-        setfillcolor(0x888888);
+        if (lightningActive) {
+            setlinecolor(LIGHTGRAY);
+        } else {
+            setlinecolor(RGB(100, 100, 100));
+        }
+        
         setbkmode(TRANSPARENT);
-        setrop2(R2_MERGEPEN);
         setlinestyle(PS_SOLID, 2);
         for (Raindrop& drop : drops) {
             line(drop.x, drop.y, drop.x, drop.y + drop.length);
         }
-        setrop2(R2_COPYPEN);
         setcolor(BLACK);
     }
 
@@ -856,6 +909,10 @@ public:
                 drop.x = rand() % WID;
             }
         }
+    }
+
+    void setLightningActive(bool active) {
+        lightningActive = active;
     }
 };
 
@@ -911,9 +968,6 @@ public:
         }
     }
 };
-
-LinkedList<GameObject> m_gameObjects;
-LinkedList<CBomb> m_bombs;
 
 class CScene {
 protected:
@@ -1131,9 +1185,10 @@ private:
     }
 };
 
-int goal = 0;
 IMAGE img_null;
 GameObject nullObject(GameObjectType::GOLD, 0, 0, GoldRadiusType::BIG, img_null, img_null);
+LinkedList<CBomb> m_bombs;
+LinkedList<GameObject> m_gameObjects;
 
 class CGame : public CScene {
 protected:
@@ -1153,11 +1208,10 @@ protected:
     
 public:
     virtual void init() {
-        goal = 1000 + ((stage - 1) % 5 + 1) * 500;
         m_gameObjects.clear();
         m_stage.init(stage);
         m_clock.init(GAME_TIME);
-        m_score.init(goal);
+        m_score.init(1000 + ((stage - 1) % 5 + 1) * 500);
         m_miner.init(img_goldminer_1, mask_goldminer_1, img_goldminer_2, mask_goldminer_2);
         m_hook.init(img_hook, mask_hook);
         m_bomb.init(img_bomb, mask_bomb);
@@ -1290,7 +1344,7 @@ private:
         int num_gold = 3 + 8 * num_index + rand() % 3;
         int num_rock = 3 + 3 * num_index + rand() % 2;
         int num_diamond = num_index + rand() % 2;
-        while (1000 * num_diamond + 320 * num_gold + 75 * num_rock - goal < 500) {
+        while (1000 * num_diamond + 320 * num_gold + 75 * num_rock - m_score.getGoal() < 500) {
             int random = rand() % 20;
             if (random == 0) {
                 ++ num_diamond;
@@ -1377,7 +1431,7 @@ public:
 
     void init() {
         CGame::init();
-        outputStatus("This is just the beginning, so only higher and higher goals");
+        // outputStatus("This is just the beginning, so only higher and higher goals");
         playBackgroundMusic(musicPath_background_normal);
     }
 
@@ -1405,33 +1459,33 @@ public:
 
     void init() {
         CGame::init();
-        rain.init(500);
+        rain.init(350);
         switch (stage) {
             case 6: // Stormy start
                 stormyTime = 2;
                 stormyInterval = 6;
-                outputStatus("Stormy start, so the game is a little bit harder");
+                // outputStatus("Stormy start, so the game is a little bit harder");
                 break;
             case 7: // More game objects
                 stormyTime = 2;
                 stormyInterval = 6;
-                outputStatus("More game objects");
+                // outputStatus("More game objects");
                 break;
             case 8: // The days are shorter
                 stormyTime = 1;
                 stormyInterval = 6;
-                outputStatus("The days are shorter");
+                // outputStatus("The days are shorter");
                 break;
             case 9: // The nights are longer
                 stormyTime = 1;
                 stormyInterval = 7;
-                outputStatus("The nights are longer");
+                // outputStatus("The nights are longer");
                 break;
             case 10: // Faster storms with less time to watch
                 startTime = 1;
                 stormyTime = 1;
                 stormyInterval = 7;
-                outputStatus("Faster storms with less time to watch");
+                // outputStatus("Faster storms with less time to watch");
                 break;
             default:
                 break;
@@ -1456,18 +1510,16 @@ public:
             }
             dark = false;
         }
+        rain.setLightningActive(!dark);
     }
 
     void render() override {
         CGame::render();
         if (dark) {
             setfillcolor(BLACK);
-            fillrectangle(0, MINER_Y + MINER_H + 10, WID, HEI);
+            fillrectangle(0, 0, WID, HEI);
         } else {
             lightning.draw();
-        }
-        for (CBomb& bomb : m_bombs) {
-            bomb.draw();
         }
         m_hook.draw();
         if (m_explosedGameObject != &nullObject) {
@@ -1486,25 +1538,27 @@ public:
 
     void init() {
         CGame::init();
+        std::string outputText = "sorry, there're something wrong";
         switch (stage) {
-            case 11: // Quicksand start
-                outputStatus("Quicksand start, so the game is a little bit harder");
+            case 11:
+                outputText = "Quicksand start, so the game is a little bit harder";
                 break;
-            case 12: // Faster settling rate
-                outputStatus("Faster settling rate");
+            case 12:
+                outputText = "Faster settling rate";
                 break;
-            case 13: // The quicksand becomes soft, so heavier objects will settle first
-                outputStatus("The quicksand becomes soft, so heavier objects will settle first");
+            case 13:
+                outputText = "The quicksand becomes soft, so heavier objects will settle first";
                 break;
-            case 14: // The quicksand becomes soft
-                outputStatus("The quicksand becomes soft");
+            case 14:
+                outputText = "The quicksand becomes soft";
                 break;
-            case 15: // Golds will fall quickly, while lighter stones fall very slowly
-                outputStatus("Golds will fall quickly, while lighter stones fall very slowly");
+            case 15:
+                outputText = "Golds will fall quickly, while lighter stones fall very slowly";
                 break;
             default:
                 break;
         }
+        // outputStatus(outputText);
         playBackgroundMusic(musicPath_background_quicksand);
     }
 
@@ -1555,25 +1609,27 @@ public:
 
     void init() {
         CGame::init();
+        std::string outputText = "sorry, there're something wrong";
         switch (stage) {
-            case 16: // Magnetic start
-                outputStatus("Magnetic start, so the game is a little bit harder");
+            case 16:
+                outputText = "Magnetic start, so the game is a little bit harder";
                 break;
-            case 17: // More game objects and stronger magnetic force
-                outputStatus("More game objects and stronger magnetic force");
+            case 17:
+                outputText = "More game objects and stronger magnetic force";
                 break;
-            case 18: // Stronger magnetic force
-                outputStatus("Stronger magnetic force");
+            case 18:
+                outputText = "Stronger magnetic force";
                 break;
-            case 19: // The magnetic force starts to change over time, so collect the side target as soon
-                outputStatus("The magnetic force starts to change over time, so collect the side target as soon");
+            case 19:
+                outputText = "The magnetic force starts to change over time, so collect the side target as soon";
                 break;
-            case 20: // Stronger magnetic force
-                outputStatus("Stronger magnetic force");
+            case 20:
+                outputText = "Stronger magnetic force";
                 break;
             default:
                 break;
         }
+        // outputStatus(outputText);
         playBackgroundMusic(musicPath_background_normal);
     }
 
@@ -1845,6 +1901,15 @@ private:
         return true;
     }
 
+    void setImageExplosivePath() {
+        for (int i = 0; i < 9; ++i) {
+            std::string imgPath ="res/explosion/explosion_0" + std::to_string(i + 1) + ".jpg";
+            std::string maskPath = "res/explosion/explosion_0" + std::to_string(i + 1) + "_mask.jpg";
+            imgPath_explosive.push_back(imgPath);
+            maskPath_explosive.push_back(maskPath);
+        }
+    }
+
     void loadIMAGE() {
         loadimage(&img_startup, imgPath_startup.c_str(), WID, HEI, true);    
         loadimage(&img_signin, imgPath_signin.c_str(), WID, HEI, true);
@@ -1873,11 +1938,11 @@ private:
         loadimage(&img_game_win, imgPath_game_win.c_str(), WID, HEI, true);
         loadimage(&img_game_lose, imgPath_game_lose.c_str(), WID, HEI, true);
         loadimage(&img_game_over, imgPath_game_over.c_str(), WID, 1684 * WID / 1180, true);
-        for (int i = 0; i < 12; ++i) {
+        for (int i = 0; i < 9; ++i) {
             IMAGE img;
             IMAGE mask;
-            loadimage(&img, imgPath_explosive[i].c_str());
-            loadimage(&mask, maskPath_explosive[i].c_str());
+            loadimage(&img, imgPath_explosive[i].c_str(), 200, 200, true);
+            loadimage(&mask, maskPath_explosive[i].c_str(), 200, 200, true);
             img_explosive.push_back(img);
             mask_explosive.push_back(mask);
         }
@@ -1962,15 +2027,15 @@ private:
         } else if (img_game_lose.getwidth() != WID || img_game_lose.getheight() != HEI) {
             std::cerr << "Failed to load img_game_lose!" << std::endl;
             return false;
-        } else if (img_explosive.size() !=12 || mask_explosive.size() != 12) {
+        } else if (img_explosive.size() != 9 || mask_explosive.size() != 9) {
             std::cerr << "Failed to load img_explosive or mask_explosive!" << std::endl;
             return false;
         } else {
-            for (int i = 0; i < 12; ++i) {
-                if (img_explosive[i].getwidth() != 191 || img_explosive[i].getheight() != 191) {
+            for (int i = 0; i < 9; ++i) {
+                if (img_explosive[i].getwidth() != 200 || img_explosive[i].getheight() != 200) {
                     std::cerr << "Failed to load img_explosive!" << std::endl;
                     return false;
-                } else if (mask_explosive[i].getwidth() != 191 || mask_explosive[i].getheight() != 191) {
+                } else if (mask_explosive[i].getwidth() != 200 || mask_explosive[i].getheight() != 200) {
                     std::cerr << "Failed to load mask_explosive!" << std::endl;
                     return false;
                 }
