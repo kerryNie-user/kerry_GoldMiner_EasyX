@@ -44,7 +44,7 @@ LinkedList<int> storedStage;             // All the stages in the file
 
 std::string username = "kerry";  // Focused user's username
 std::string password = "kerry";  // Focused user's password
-int stage = 9;                   // Focused user's stage
+int stage = 1;                   // Focused user's stage
 
 std::string filePath = "users.txt";
 std::string imgPath_startup = "res/img_startup.jpg";
@@ -387,13 +387,16 @@ public:
 
 class CButton : public CControl {
 private:
-    int X, Y, W, H;
-    ButtonCallBack callback;
+    int X, Y, W, H;  // The button detecting area
+    ButtonCallBack callback;  // Callback function for each button(if you want your button have some reaction when clicking it you need to implement it)
 
 public:
     CButton(int x, int y, int w, int h, const std::string& text, ButtonCallBack callback) 
         : CControl(x, y, w, h, text), X(x), Y(y), W(w), H(h), callback(callback) {}
 
+    /**
+     * @brief 
+     */
     void simulateMouseMSG(MOUSEMSG m) {
         if (isMouseInButton(m.x, m.y)) {
             if (m.uMsg == WM_LBUTTONDOWN) {
