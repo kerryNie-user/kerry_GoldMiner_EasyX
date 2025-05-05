@@ -140,6 +140,7 @@ const int HOOK_X = MINER_X + MINER_W * 0.18;
 const int HOOK_Y = MINER_Y + MINER_H * 0.6;
 const int HOOK_LENGTH = 30;  // Length of the line from the miner to the hook
 const int HOOK_SPEED = SLEEP_TIME * 0.7;  // Speed of the hook when going out
+const int HOOKED_SIZE = 40;  // To detect if the object is hooked
 const int BOMB_W = 15;
 const int BOMB_H = 30;
 const int GAME_TIME = 99;
@@ -395,25 +396,26 @@ public:
         : CControl(x, y, w, h, text), X(x), Y(y), W(w), H(h), callback(callback) {}
 
     /**
-     * @brief 
+     * @brief Simulate the mouse message of the button.
+     * @param m The mouse message.
      */
     void simulateMouseMSG(MOUSEMSG m) {
         if (isMouseInButton(m.x, m.y)) {
-            if (m.uMsg == WM_LBUTTONDOWN) {
+            if (m.uMsg == WM_LBUTTONDOWN) {  // if the mouse is clicked down, then it will be focused(for if you want some special reaction)
                 isFocused = true;
-            } else if (m.uMsg == WM_LBUTTONUP) {
+            } else if (m.uMsg == WM_LBUTTONUP) {  // if the mouse is released, and it's still on focused button, the button will reform the action
                 isFocused = false;
                 isReleased = true;
             }
         } else {
             isFocused = false;
         }
-        if (isFocused) {
+        if (isFocused) {  // for special reaction: smaller and blacker when it's focused
             x = X + W * 1 / 20;
             y = Y + H * 1 / 20;
             w = W * 9 / 10;
             h = H * 9 / 10;
-        } else if (isReleased) {
+        } else if (isReleased) {  // for special reaction: back to normal when it's released
             x = X;
             y = Y;
             w = W;
@@ -428,31 +430,42 @@ class CInputBox : public CControl {
 public:
     CInputBox(int x, int y, int w, int h) : CControl(x, y, w, h, "") {}
 
+    /**
+     * @brief Get the text have been input.
+     * @return text.
+     */
     std::string getInputText() const {
         return text;
     }
 
+    /**
+     * @brief Simulate the mouse message of the input box.
+     * @param m The mouse message.
+     */
     void simulateMouseMSG(MOUSEMSG m) {
         if (m.uMsg == WM_LBUTTONDOWN) {
-            if (isMouseInButton(m.x, m.y)) {
+            if (isMouseInButton(m.x, m.y)) {  // get the focus when the mouse is clicked down
                 isFocused = true;
-            } else {
+            } else {  // release the focus when the mouse clicking outside the input box
                 isFocused = false;
             }
         }
     }
 
+    /**
+     * @brief Simulate the keyboard message including "backspace", "return" and the normal input.
+     */
     void simulateKeyboardMSG() {
         if (isFocused) {
             if (kbhit()) {
                 wchar_t ch = _getwch();
-                if (ch == L'\r') {
+                if (ch == L'\r') {  // when the user press "return", the focus will be released
                     isFocused = false;
-                } else if (ch == L'\b') {
+                } else if (ch == L'\b') {  // when the user press "backspace", the last character will be deleted if there is any
                     if (!text.empty()) {
                         text.pop_back();
                     }
-                } else {
+                } else {  // normal input
                     text += ch;
                 }
             }
@@ -464,6 +477,13 @@ class CObject {
 protected:
     virtual void draw() = 0;
 
+    /**
+     * @brief Put the image with the mask on the screen.
+     * @param img The image to be put.
+     * @param mask The mask of the image.
+     * @param x The x coordinate of the image.
+     * @param y The y coordinate of the image.
+     */
     void putimgwithmask(IMAGE& img, IMAGE& mask, int x, int y) const {
         putimage(x, y, &mask, NOTSRCERASE);
         putimage(x, y, &img, SRCINVERT);
@@ -472,20 +492,23 @@ protected:
 
 class CMiner : public CObject {
 private:
-    int x, y;
-    int w, h;
-    bool working;
-    bool usingEnergy;
-    bool showSecondImage;
-    std::chrono::time_point<std::chrono::system_clock> lastTime;
-    IMAGE img1;
-    IMAGE mask1;
-    IMAGE img2;
-    IMAGE mask2;
+    int x, y, w, h;  // Coordinates and dimensions of the miner
+    bool working;  // Whether the miner's dragging the hook
+    bool usingEnergy;  // Whether there is something in the hook
+    bool showSecondImage;  // The bool variable for the animation of the miner
+    std::chrono::time_point<std::chrono::system_clock> lastTime;  // A timestamp for the last time the miner's animation is updated
+    IMAGE img1, mask1, img2, mask2;  // The two images and masks of the miner
 
 public:
     CMiner() : x(MINER_X), y(MINER_Y), w(MINER_W), h(MINER_H) {}
 
+    /**
+     * @brief Initialize the miner with the two images and masks.
+     * @param img1 The first image of the miner.
+     * @param mask1 The first mask of the miner.
+     * @param img2 The second image of the miner.
+     * @param mask2 The second mask of the miner.
+     */
     void init(IMAGE& img1, IMAGE& mask1, IMAGE& img2, IMAGE& mask2) {
         this->working = false;
         this->usingEnergy = false;
@@ -496,6 +519,9 @@ public:
         this->mask2 = mask2;
     }
 
+    /**
+     * @brief Draw the miner on the screen.
+     */
     void draw() {
         if (working && showSecondImage) {
             putimgwithmask(img2, mask2, x, y);
@@ -504,20 +530,11 @@ public:
         }
     }
 
-    void work() {
-        working = true;
-    }
-
-    void useEnergy() {
-        working = true;
-        usingEnergy = true;
-    }
-
-    void stop() {
-        working = false;
-        usingEnergy = false;
-    }
-
+    /**
+     * @brief Update the miner's animation.
+     * If the miner is working and the interval between the last time and the current time is greater than "interval", the miner's animation will be updated.
+     * If the miner is using energy, the "interval" will be 0.5 second, otherwise it will be 0.25 second.
+     */
     void update() {
         auto currentTime = std::chrono::system_clock::now();
         std::chrono::duration<double> elapsedTime = currentTime - lastTime;
@@ -527,50 +544,85 @@ public:
             lastTime = currentTime;
         }
     }
+
+    /**
+     * @brief Let the miner work.
+     */
+    void work() {
+        working = true;
+    }
+
+    /**
+     * @brief Let the miner using energy, because there is something in the hook.
+     */
+    void useEnergy() {
+        working = true;
+        usingEnergy = true;
+    }
+
+    /**
+     * @brief Let the miner stop, because the hook is stop.
+     */
+    void stop() {
+        working = false;
+        usingEnergy = false;
+    }
 };
 
 class CHook : public CObject {
 private:
-    int x, y;
-    double endX, endY;
-    int length;
-    int speed;
-    double angle;
-    double angleSpeed;
-    bool rotate = true;
-    bool isMoving = false;
-    bool isRetracting = false;
-    IMAGE img;
-    IMAGE mask;
-    IMAGE img_rotate;
-    IMAGE mask_rotate;
+    int x, y;  // Coordinates of the start point of the line(connected to the miner)
+    double endX, endY;  // Coordinates of the end point of the line(connected to the hook)
+    int length;  // Length of the line
+    int speed;  // Speed of the line
+    double angle;  // Angle of the line(0 degree is three o'clock)
+    double angleSpeed;  // Angular velocity
+    bool isMoving = false;  // Whther the line is moving(including going out and retracting)
+    bool isRetracting = false;  // Whether the line is retracting
+    IMAGE img, mask;  // The image and mask of the hook
+    IMAGE img_rotate, mask_rotate;  // The rotated image and mask of the hook
 
 public:
     CHook() : x(HOOK_X), y(HOOK_Y), length(HOOK_LENGTH), speed(HOOK_SPEED), angleSpeed(SLEEP_TIME * 0.15), rotate(true) {}
 
+    /**
+     * @brief Initialize the hook with the image and mask.
+     * @param img The image of the hook.
+     * @param mask The mask of the hook.
+     */
     void init(IMAGE& img, IMAGE& mask) {
         angle = 90;
         this->img = img;
         this->mask = mask;
     }
 
+    /**
+     * @brief Draw the hook on the screen.
+     * Draw the line
+     * Rotate the image and mask
+     * Use a function to fit the hook's center to the line's end point.
+     * Adjust the position of the image according to my calculations and draw it.
+     */
     void draw() {
         setcolor(BLACK);
         setlinecolor(BLACK);
         setfillcolor(BLACK);
         setlinestyle(PS_SOLID, 2);
         line(x, y, endX, endY);
-        if (rotate) {
-            rotateimage(&img_rotate, &img, degreesToRadians(90 - angle), WHITE, true);
-            rotateimage(&mask_rotate, &mask, degreesToRadians(90 - angle), BLACK, true);
-            int imageX = endX - img.getwidth() * std::sin(degreesToRadians(angle)) / 2 - img.getheight() * (1 - std::cos(degreesToRadians(angle))) / 2;
-            int imageY = endY - img.getwidth() * std::abs(std::cos(degreesToRadians(angle))) / 2;
-            putimgwithmask(img_rotate, mask_rotate, imageX, imageY);
-        } else {
-            putimgwithmask(img, mask, endX - img.getwidth() / 2, endY);
-        }
+        rotateimage(&img_rotate, &img, degreesToRadians(90 - angle), WHITE, true);
+        rotateimage(&mask_rotate, &mask, degreesToRadians(90 - angle), BLACK, true);
+        int imageX = endX - img.getwidth() * std::sin(degreesToRadians(angle)) / 2 - img.getheight() * (1 - std::cos(degreesToRadians(angle))) / 2;
+        int imageY = endY - img.getwidth() * std::abs(std::cos(degreesToRadians(angle))) / 2;
+        putimgwithmask(img_rotate, mask_rotate, imageX, imageY);
     }
 
+    /**
+     * @brief Update the hook's status(including it's rotate angel and it's position when it is going out).
+     * Update the end point of the line with the current angel.
+     * case1: If the hook is swaing, then check the angel(20 - 160 degree) and update it.
+     * case2: If the hook is going out, then update the length and check if it's out of the screen.
+     * case3: If the hook is retracting, then update the length and check if it's back to the miner(whether the current length is shorter then start).
+     */
     void update() {
         if (isRetracting && !isMoving) {
             std::cerr << "There's something wrong with hook update" << std::endl;
@@ -603,29 +655,14 @@ public:
         }
     }
 
-    bool isGoingOut() {
-        return length > HOOK_LENGTH && isMoving && !isRetracting;
-    }
-
-    bool isGoingBack() {
-        return length > HOOK_LENGTH && isMoving && isRetracting;
-    }
-    bool isStop() {
-        return (!isMoving) && (!isRetracting) && (length <= HOOK_LENGTH);
-    }
-
-    void setmageticmode() {
-        rotate = false;
-    }
-
-    void setSpeed(int speed) {
-        this->speed = speed;
-    }
-
-    void move() {
-        isMoving = true;
-    }
-
+    /**
+     * @brief Magnetic function.
+     * This is a special function made for the MagneticScene, in this type of scene, the hook will be attracted to the magnetic source.
+     * @see CGameMagnetic::update()
+     * @param magnetic_source_x The x coordinate of the magnetic source.
+     * @param magnetic_source_y The y coordinate of the magnetic source.
+     * @param magnetic_strength The strength of the magnetic force.
+     */
     void magnetic(int magnetic_source_x, int magnetic_source_y, double magnetic_strength) {
         int angle_target = std::atan2(magnetic_source_y - y, magnetic_source_x - x) * 180 / M_PI;
         int angle_distance = angle_target - angle;
@@ -635,27 +672,95 @@ public:
         angle += magnetic_force * angle_distance;
     }
 
+    /**
+     * @brief Check if the hook is going out.
+     * @return True if the hook is going out, false otherwise.
+     */
+    bool isGoingOut() {
+        return length > HOOK_LENGTH && isMoving && !isRetracting;
+    }
+
+    /**
+     * @brief Check if the hook is retracting.
+     * @return True if the hook is retracting, false otherwise.
+     */
+    bool isGoingBack() {
+        return length > HOOK_LENGTH && isMoving && isRetracting;
+    }
+
+    /**
+     * @brief Check if the hook is stop.
+     * If the hook is not moving and not retracting and the length is smaller than the start length, then the hook is stop.
+     * @return True if the hook is stop, false otherwise.
+     */
+    bool isStop() {
+        return (!isMoving) && (!isRetracting) && (length <= HOOK_LENGTH);
+    }
+
+    /**
+     * @brief Set the speed of the hook.
+     * Usually, when there is somethinng hooked, the speed will be set to the object's speed.
+     * And when the hook is back, the speed will be set to the original speed.
+     * @param speed The speed of the hook.
+     */
+    void setSpeed(int speed) {
+        this->speed = speed;
+    }
+
+    /**
+     * @brief Move the hook.
+     * Set the isMoving to true.
+     */
+    void move() {
+        isMoving = true;
+    }
+
+    /**
+     * @brief Retract the hook.
+     * Set the isRetracting to true, usually when the hook is going out and the object is hooked, the hook will retract, or when the hook is out of the screen.
+     */
     void retract() {
         isRetracting = true;
     }
 
+    /**
+     * @brief Stop the hook.
+     * Set the isMoving and isRetracting to false.
+     */
     void stop() {
         isMoving = false;
         isRetracting = false;
     }
     
+    /**
+     * @brief Get the end point x of the line.
+     * @return The end point x of the line.
+     */
     int getEndX() const {
         return endX;
     }
 
+    /**
+     * @brief Get the end point y of the line.
+     * @return The end point y of the line.
+     */
     int getEndY() const {
         return endY;
     }
 
+    /**
+     * @brief Get the length of the line.
+     * Usually for adjust whether the hook is back.
+     * @return The length of the line.
+     */
     int getLength() const {
         return length;
     }
 
+    /**
+     * @brief Get the angle of the line.
+     * @return The angle of the line.
+     */
     double getAngle() const {
         return angle;
     }   
@@ -663,10 +768,10 @@ public:
 
 class CBomb : public CObject {
 private:
-    int x, y;
-    bool blowUp;
-    IMAGE imgB;
-    IMAGE maskB;
+    int x, y;  // The coordinates of the bomb
+    bool blowUp;  // Whether the bomb is blew up
+    IMAGE img;  // The image of the bomb
+    IMAGE mask;  // The mask of the bomb
 
 public:
     CBomb() : blowUp(false) {}
@@ -675,18 +780,32 @@ public:
         return this->x == other.x && this->y == other.y;
     }
 
-    void init(IMAGE& imgB, IMAGE& maskB) {
-        this->imgB = imgB;
-        this->maskB = maskB;
+    /**
+     * @brief Initialize the bomb with the image and mask.
+     * @param img The image of the bomb.
+     * @param mask The mask of the bomb.
+     */
+    void init(IMAGE& img, IMAGE& mask) {
+        this->img = img;
+        this->mask = mask;
     }
 
+    /**
+     * @brief Set the coordinates of the bomb.
+     * Usually, this function is used for initialize the bombs array.
+     * @param x The x coordinate of the bomb.
+     * @param y The y coordinate of the bomb.
+     */
     void setXY(int x, int y) {
         this->x = x;
         this->y = y;
     }
 
+    /**
+     * @brief Draw the bomb on the screen.
+     */
     void draw() override {
-        putimgwithmask(imgB, maskB, x, y);
+        putimgwithmask(img, mask, x, y);
     }
 };
 
@@ -698,10 +817,9 @@ protected:
     int speed;
     int score;
     bool isBombed = false;
-    int explosedIndex = -1;
-    std::time_t explosedTime;
-    IMAGE img;
-    IMAGE mask;
+    int explosedIndex = -1;  // For the animation of the explosive, -1 means the object is not booming
+    std::time_t explosedTime;  // A timestamp for the booming of this object
+    IMAGE img, mask;
 
 public:
     GameObject() {}
@@ -736,6 +854,11 @@ public:
         return !operator==(other);
     }
 
+    /**
+     * @brief Draw the object on the screen.
+     * If the object is bombed, then draw the explosive animation.
+     * Otherwise, draw the normal image.
+     */
     void draw() {
         if (isBombed && explosedIndex != -1) {
             int explosedX = x + radius - img_explosive[explosedIndex].getwidth() / 2;
@@ -746,20 +869,20 @@ public:
         }
     }
 
+    /**
+     * @brief Move the object by it's speed.
+     * @param moveangle The angle of the movement.
+     */
     void move(int moveangle) {
         x -= speed * cos(degreesToRadians(moveangle));
         y -= speed * sin(degreesToRadians(moveangle));
     }
 
-    void submerge(int distance) {
-        y += distance;
-    }
-        
-    void bomb() {
-        explosedTime = getCurrentTimeInMilliseconds();
-        isBombed = true;
-    }
-
+        /**
+     * @brief Update for booming animation's index.
+     * If the booming is not finished, then update the index of the animation.
+     * Otherwise, set the isBombed to false.
+     */
     void explosing() {
         std::time_t currentTime = getCurrentTimeInMilliseconds();
         std::time_t elapsedTime = currentTime - explosedTime;
@@ -771,35 +894,89 @@ public:
             isBombed = false;
         }
     }
+
+    /**
+     * @brief Submerge the object by the distance.
+     * This is a special function made for the QuickSandScene, in this type of scene, the object will keep submerging.
+     * @see CGameQuickSand::update()
+     * @param distance The distance of the submerge.
+     */
+    void submerge(int distance) {
+        y += distance;
+    }
     
+    /**
+     * @brief Bomb the object.
+     * Set the isBombed to true and record the start timestamp.
+     */
+    void bomb() {
+        explosedTime = getCurrentTimeInMilliseconds();
+        isBombed = true;
+    }
+    
+    /**
+     * @brief Check if the object is hooked.
+     * @param hookX The x coordinate of the hook.
+     * @param hookY The y coordinate of the hook.
+     * @return True if the object is hooked, false otherwise.
+     */
     bool isHooked(int hookX, int hookY) {
-        return std::pow((x + radius - hookX), 2) + std::pow((y + radius - hookY), 2) - radius * radius <= 35;
+        return std::pow((x + radius - hookX), 2) + std::pow((y + radius - hookY), 2) - radius * radius <= HOOKED_SIZE;
     }
 
+    /**
+     * @brief Check if the object is bombed.
+     * @return True if the object is bombed, false otherwise.
+     */
     bool bombed() const {
         return isBombed;
     }
 
+    /**
+     * @brief Get the type of the object.
+     * @return The type of the object.
+     */
     GameObjectType getType() const {
         return type;
     }
     
+    /**
+     * @brief Get the score if this object is get by miner.
+     * @return The score of the object.
+     */
     int getScore() const {
         return score;
     }
     
+    /**
+     * @brief Get the speed of the object.
+     * Usually, this speed will be used for hook's speed update.
+     * @return The speed of the object.
+     */
     int getSpeed() const {
         return speed;
     }
     
+    /**
+     * @brief Get the radius of the object.
+     * @return The radius of the object.
+     */
     int getRadius() const {
         return radius;
     }
     
+    /**
+     * @brief Get the center x coordinate of the object.
+     * @return The center x coordinate of the object.
+     */
     int getRx() const {
         return x + radius;
     }
     
+    /**
+     * @brief Get the center y coordinate of the object.
+     * @return The center y coordinate of the object.
+     */
     int getRy() const {
         return y + radius;
     }
@@ -848,6 +1025,10 @@ public:
     }
 };
 
+/**
+ * @brief A factory class for creating game objects.
+ * This class is used to create game objects with different types.
+ */
 class GameObjectFactory {
 public:
     static GameObject createGameObject(GameObjectType type, int x, int y, int radiusType, IMAGE& img, IMAGE& mask) {
