@@ -1053,12 +1053,17 @@ typedef struct {
 
 class Rain {
 private:
-    LinkedList<Raindrop> drops;
-    bool lightningActive = true;
+    LinkedList<Raindrop> drops;  // A linked list to store every raindrops
+    bool lightningActive = true;  // Whether the lightning is active (Used to judge whether it is lignt)
 
 public:
     Rain() {}
 
+    /**
+     * @brief Initialize the raindrops.
+     * This function will create every raindrops completely at random position and speed.
+     * @param count The number of raindrops.
+     */
     void init(int count) {
         for (int i = 0; i < count; ++i) {
             Raindrop drop;
@@ -1070,13 +1075,17 @@ public:
         }
     }
 
+    /**
+     * @brief Draw the raindrops on the screen.
+     * This function will draw every raindrops on the screen.
+     * If the lightning is active, then the raindrops will be drawn in gray color. Otherwise, the raindrops will be drawn in black color. That will make the raindrops look more natural.
+     */
     void draw() {
         if (lightningActive) {
             setlinecolor(LIGHTGRAY);
         } else {
             setlinecolor(RGB(100, 100, 100));
         }
-        
         setbkmode(TRANSPARENT);
         setlinestyle(PS_SOLID, 2);
         for (Raindrop& drop : drops) {
@@ -1085,6 +1094,11 @@ public:
         setcolor(BLACK);
     }
 
+    /**
+     * @brief Update the raindrops.
+     * This function will update every raindrops.
+     * If the raindrop is out of the screen, then it will be reset to the top of the screen.
+     */
     void update() {
         for (Raindrop& drop : drops) {
             drop.y += drop.speed;
@@ -1102,18 +1116,28 @@ public:
 
 class Lightning {
 private:
-    LinkedList<POINT> points;
-    bool isActive;
-    int duration;
+    LinkedList<POINT> points;  // The path points of the lightning
+    bool isActive;  // Whether the lightning is active
+    int duration;  // The duration time of the lightning
 
 public:
     Lightning() {}
 
+    /**
+     * @brief Initialize the lightning.
+     * This function will create the lightning with the duration time at milliseconds.
+     * @param duration The duration time of the lightning.
+     */
     void init(int duration) {
         this->duration = duration * 1000 / SLEEP_TIME;
         isActive = false;
     }
 
+    /**
+     * @brief Generate the lightning.
+     * This function will generate the lightning with the path points, unless the lightning is out of the screen.
+     * The path points will be generated randomly.
+     */
     void generateLightning() {
         points.clear();
         isActive = true;
@@ -1132,6 +1156,10 @@ public:
         }
     }
     
+    /**
+     * @brief Draw the lightning on the screen.
+     * If the lightning is active, the lines will connect all of the path points and act just like a real lightning.
+     */
     void draw() {
         if (isActive) {
             setlinestyle(PS_SOLID, 5);
@@ -1143,6 +1171,11 @@ public:
         }
     }
     
+    /**
+     * @brief Update the lightning.
+     * If the lightning is active, then the duration time will be reduced by 1.
+     * If the duration time is 0, then the lightning will be deactivated.
+     */
     void update() {
         if (isActive) {
             --duration;
@@ -1164,6 +1197,11 @@ public:
     virtual void render() = 0;
 
 protected:
+    /**
+     * @brief Output the status of the game.
+     * This function will output the status of the game and wait for click.
+     * @param text The text of the status.
+     */
     void outputStatus(std::string text) {
         setbkmode(TRANSPARENT);
         setbkcolor(WHITE);
@@ -1182,16 +1220,30 @@ protected:
         }
     }
 
+    /**
+     * @brief Play the background music.
+     * This function will shut all the background music and play the new music.
+     * @param music The path of the music.
+     */
     void playBackgroundMusic(std::string& music) {
         mciSendString("close bkmusic", NULL, 0, NULL);
         mciSendString(("open " + music + " alias bkmusic").c_str(), NULL, 0, NULL);
         mciSendString("play bkmusic repeat", NULL, 0, NULL);
     }
 
+    /**
+     * @brief End the background music.
+     */
     void endBackgroundMusic() {
         mciSendString("close bkmusic", NULL, 0, NULL);
     }
 
+    /**
+     * @brief Play the special effect music.
+     * This function will shut the special effect music with the same name.
+     * And play the new music with the name input path of the music.
+     * @param music The path of the music.
+     */
     void playSpecialEffectMusic(std::string& music) {
         mciSendString(("close " + music).c_str(), NULL, 0, NULL);
         mciSendString(("open " + music + " alias " + music).c_str(), NULL, 0, NULL);
@@ -1199,6 +1251,10 @@ protected:
     }
 };
 
+/**
+ * @brief The menu scene.
+ * This scene is the first scene of the game.
+ */
 class CMenu : public CScene {
 private:
     CButton m_button_signin;
@@ -1209,6 +1265,11 @@ public:
         m_button_signin(0.654 * WID, 0.5 * HEI, 0.3 * WID, 0.1625 * HEI, "signin", std::bind(&CMenu::callbackSignin, this)), 
         m_button_login(0.025 * WID, 0.5 * HEI, 0.3 * WID, 0.1625 * HEI, "login", std::bind(&CMenu::callbackLogin, this)) {}
 
+    /**
+     * @brief Update the menu.
+     * If the mouse is clicked, then the buttoncallback function will be called.
+     * @see CButton::simulateMouseMSG()
+     */
     void update() override{
         MOUSEMSG m;
         if (MouseHit()) {
@@ -1218,21 +1279,36 @@ public:
         }
     }
 
+    /**
+     * @brief Render the start menu.
+     */
     void render() override {
         cleardevice();
         putimage(0, 0, &img_startup);
     }
 
 private:
+    /**
+     * @brief Callback function for the signin button.
+     * This function will set the game scene to signin scene.
+     */
     void callbackSignin() {
         setGameScene(GameSceneType::SIGNIN);
     }
 
+    /**
+     * @brief Callback function for the login button.
+     * This function will set the game scene to login scene.
+     */
     void callbackLogin() {
         setGameScene(GameSceneType::LOGIN);
     }
 };
 
+/**
+ * @brief The login scene.
+ * This scene is used to sign up a new account and login this account.
+ */
 class CSignin : public CScene {
 private:
     bool confirm;    
@@ -1250,6 +1326,12 @@ public:
         m_button_ok(0.5225 * WID, 0.655 * HEI, 0.2175 * WID, 0.1125 * HEI, "OK", std::bind(&CSignin::callbackOk, this)), 
         m_button_cancel(0.2808 * WID, 0.655 * HEI, 0.2175 * WID, 0.1125 * HEI, "CANCEL", std::bind(&CSignin::callbackCancel, this)) {}
 
+    /**
+     * @brief Update the signin scene.
+     * If the mouse is clicked, then the buttoncallback function of the button and the input box will be called.
+     * @see CButton::simulateMouseMSG()
+     * @see CInputBox::simulateMouseMSG()
+     */ 
     void update() override {
         MOUSEMSG m;
         if (MouseHit()) {
@@ -1265,6 +1347,10 @@ public:
         m_input_confirm.simulateKeyboardMSG();
     }
 
+    /**
+     * @brief Render the signin scene.
+     * The word have been written in the input box will be shown on the screen in time.
+     */
     void render() override {
         cleardevice();
         putimage(0, 0, &img_signin);
@@ -1277,6 +1363,12 @@ public:
     }
 
 private:
+    /**
+     * @brief Callback function for the ok button.
+     * This function will check the input of the user.
+     * If the inputs is all valid, then detect whether the username has been used.
+     * If not, then the username and password will be stored in the linked list, which will be stored in the file after the game is closed.
+     */
     void callbackOk() {
         username = m_input_username.getInputText();
         password = m_input_password.getInputText();
@@ -1308,11 +1400,19 @@ private:
         setGameScene(GameSceneType::GAME);
     }
 
+    /**
+     * @brief Callback function for the cancel button.
+     * This function will set the game scene to menu scene.
+     */
     void callbackCancel() {
         setGameScene(GameSceneType::MENU);
     }
 };
 
+/**
+ * @brief The login scene.
+ * This scene is used to login the account.
+ */
 class CLogin : public CScene {
 private:
     CInputBox m_input_username;
@@ -1326,6 +1426,12 @@ public:
         m_input_username(0.3675 * WID, 0.3675 * HEI, 0.3816 * WID, 0.0825 * HEI),
         m_input_password(0.3675 * WID, 0.48125 * HEI, 0.3816 * WID, 0.0825 * HEI) {}
 
+    /**
+     * @brief Update the login scene.
+     * If the mouse is clicked, then the buttoncallback function of the button and the input box will be called.
+     * @see CButton::simulateMouseMSG()
+     * @see CInputBox::simulateMouseMSG()
+     */
     void update() override {
         MOUSEMSG m;
         if (MouseHit()) {
@@ -1339,6 +1445,10 @@ public:
         m_input_password.simulateKeyboardMSG();
     }
 
+    /**
+     * @brief Render the login scene.
+     * The word have been written in the input box will be shown on the screen in time.
+     */
     void render() override {
         cleardevice();
         putimage(0, 0, &img_login);
@@ -1350,6 +1460,12 @@ public:
     }
 
 private:
+    /**
+     * @brief Callback function for the ok button.
+     * This function will check the input of the user.
+     * If the inputs is all valid, then detect whether the username and password are correct.
+     * If correct, then the username and password will extracted from the linked list, and used for the gaming user update.
+     */
     void callbackOk() {
         username = m_input_username.getInputText();
         password = m_input_password.getInputText();
@@ -1357,6 +1473,9 @@ private:
             if (username == storedUsername[i] && password == storedPassword[i]) {
                 stage = storedStage[i];
                 outputStatus("Welcome back...");
+                if (stage > 20) {
+                    stage = 1;
+                }
                 setGameScene(GameSceneType::GAME);
                 return;
             }
@@ -1364,15 +1483,19 @@ private:
         outputStatus("Username or Password incorrect");
     }
 
+    /**
+     * @brief Callback function for the cancel button.
+     * This function will set the game scene to menu scene.
+     */
     void callbackCancel() {
         setGameScene(GameSceneType::MENU);
     }
 };
 
-IMAGE img_null;
-GameObject nullObject(GameObjectType::GOLD, 0, 0, GoldRadiusType::BIG, img_null, img_null);
-LinkedList<CBomb> m_bombs;
-LinkedList<GameObject> m_gameObjects;
+IMAGE img_null;  // A null image for the null object
+GameObject nullObject(GameObjectType::GOLD, 0, 0, GoldRadiusType::BIG, img_null, img_null);  // A null object for the 'null' pointer
+LinkedList<CBomb> m_bombs;             // A linked list to store every bombs
+LinkedList<GameObject> m_gameObjects;  // A linked list to store every game objects
 
 class CGame : public CScene {
 protected:
@@ -1385,12 +1508,16 @@ protected:
     CButton m_button_quit;
     GameObject* m_focusedGameObject = &nullObject;
     GameObject* m_explosedGameObject = &nullObject;
-    bool countdown = false;
+    bool countdown = false;  // Whether the countdown effective sound is need to be played
 
     CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), m_clock(), m_score(), m_stage(), m_miner(), m_hook(), m_bomb(),
         m_button_quit(0.638 * WID, 0.01375 * HEI, 0.14 * WID, 0.07 * HEI, "Quit", std::bind(&CGame::callbackQuit, this)) {}
     
 public:
+    /**
+     * @brief Initialize the game.
+     * This function will initialize all the components and gameObjects in the game.
+     */
     virtual void init() {
         m_gameObjects.clear();
         m_stage.init(stage);
@@ -1408,6 +1535,10 @@ public:
         updateWithoutInput();
     }
 
+    /**
+     * @brief Render the game.
+     * This function will render all the components and gameObjects in the game.
+     */
     void render() override {
         cleardevice();
         setbkcolor(WHITE);
@@ -1435,6 +1566,19 @@ public:
     }
 
 private:
+    /**
+     * @brief Update the components and gameObjects been operated in the game.
+     * I will detect whether the mouse is clicked.
+     * If the mouse is clicking the button, then the buttoncallback function of the button will be called.
+     * If the left button is clicked, then the hook will move and the miner will work.
+     * If the right button is clicked, then the hook will retract and the focused gameObject will be bombed if have.
+     * And I will also detect whether the keyboard is pressed.
+     * If 'return key' or 'space key' is pressed, then the hook will move and the miner will work.
+     * If 'backspace key' is pressed, then the hook will retract and the focused gameObject will be bombed if have.
+     * If 'q key' or 'Q key' is pressed, then the game scene will be set to menu scene.
+     * If 'p key' or 'P key' is pressed, then the game will be paused.
+     * @see CButton::simulateMouseMSG()
+     */
     void updateWithInput() {
         if (MouseHit()) {
             MOUSEMSG m = GetMouseMsg();
@@ -1455,20 +1599,63 @@ private:
                 }
             }
         }
+        if (kbhit()) {
+            wchar_t ch = _getwch();
+            if (ch == L'\r' || ch == L' ') {
+                m_hook.move();
+                m_miner.work();
+                playSpecialEffectMusic(musicPath_hook_goingOut);
+            } else if (ch == L'\b') {  // when the user press "backspace", the last character will be deleted if there is any
+                if (m_hook.isGoingBack() && m_bombs.size() > 0) {
+                    m_hook.setSpeed(HOOK_SPEED);
+                    if (m_focusedGameObject != &nullObject) {
+                        m_focusedGameObject->bomb();
+                        playSpecialEffectMusic(musicPath_bomb_explosive);
+                    }
+                }
+            } else if (ch == L'q' || ch == L'Q') {
+                setGameScene(GameSceneType::MENU);
+            } else if (ch == L'p' || ch == L'P') {
+                while (true) {
+                    MOUSEMSG m = GetMouseMsg();
+                    m_button_quit.simulateMouseMSG(m);
+                    if (m.uMsg == WM_LBUTTONDOWN) {
+                        break;
+                    }
+                    if (kbhit()) {
+                        wchar_t ch = _getwch();
+                        if (ch == L'q' || ch == L'Q') {
+                            setGameScene(GameSceneType::MENU);
+                            return;
+                        } else if (ch == L'p' || ch == L'P') {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
 
+    /**
+     * @brief Update the components and gameObjects in the game.
+     * This function will update all the components and gameObjects in the game.
+     * If the clock is continue, then the game will continue.
+     * If the clock is not continue, then the game will be over.
+     * If the gameObjects is empty, then the game will be won.
+     * If the gameObjects is not empty, then the game will be continued.
+     */
     void updateWithoutInput() {
         if (!m_clock.isContinue()) {
-            endBackgroundMusic();
-            if (m_score.reachGoal()) {
+            endBackgroundMusic();  // If the game is end, then end the backMusic
+            if (m_score.reachGoal()) {  // If you reach the goal, then win
                 outputStatus("GOOD!");
                 ++stage;
                 setGameScene(GameSceneType::WIN);
-            } else {
+            } else {  // If you have not reach the goal, then loose
                 outputStatus("LOOSE!");
                 setGameScene(GameSceneType::LOSE);
             }
-        } else if (m_gameObjects.empty()) {
+        } else if (m_gameObjects.empty()) {  // If game object is empty, then win
             endBackgroundMusic();
             outputStatus("AMAZING!!!");
             ++stage;
@@ -1480,7 +1667,7 @@ private:
             if (m_hook.isStop()) {
                 m_miner.stop();
             }
-            if (m_focusedGameObject == &nullObject) {
+            if (m_focusedGameObject == &nullObject) {  // If there's no focused gameObject, then find which gameObject can be focused
                 if (m_hook.isGoingOut()) {
                     for (GameObject& obj : m_gameObjects) {
                         if (obj.isHooked(m_hook.getEndX(), m_hook.getEndY())) {
@@ -1491,40 +1678,43 @@ private:
                         }
                     }
                 }
-            } else {
-                if (m_focusedGameObject->bombed()) {
+            } else {  // If there's a focused gameObject, it means the hook is going back with the focused gameObject
+                if (m_focusedGameObject->bombed()) {  // If the focused gameObject is bombed
                     m_bombs.erase(m_bombs[m_bombs.size() - 1]);
-                    m_explosedGameObject = m_focusedGameObject;
+                    m_explosedGameObject = m_focusedGameObject;  // give ownership of the gameObject to the explosedGameObject
                     m_focusedGameObject = &nullObject;
                 } else {
-                    if (m_hook.isStop()) {
+                    if (m_hook.isStop()) {  // If the hook is stop, then erase the focused gameObject and get the score
                         m_score.get(m_focusedGameObject->getScore());
                         playMusicForGameObject(*m_focusedGameObject);
                         m_gameObjects.erase(*m_focusedGameObject);
                         m_focusedGameObject = &nullObject;
                         m_miner.stop();
                     }
-                    m_focusedGameObject->move(m_hook.getAngle());
+                    m_focusedGameObject->move(m_hook.getAngle());  // If the hook is not stop, then the focused gameObject will move with the hook
                 }
             }
         }
-        if (m_explosedGameObject != &nullObject) {
-            if (m_explosedGameObject->bombed()) {
+        if (m_explosedGameObject != &nullObject) {  // If there is something need to be exploded
+            if (m_explosedGameObject->bombed()) {  // If the booming isn't finished, then start the booming
                 m_explosedGameObject->explosing();
-            } else {
+            } else {  // If the booming is finished, then erase the gameObject from the gameObjects list.
                 m_gameObjects.erase(*m_explosedGameObject);
                 m_explosedGameObject = &nullObject;
             }
         }
-        if (!countdown && m_clock.remainTime() == 5) {
+        if (!countdown && m_clock.remainTime() == 5) {  // If there is 5 seconds left, then play the countdown sound
             playSpecialEffectMusic(musicPath_countdown);
             countdown = true;
         }
     }
 
+    /**
+     * @brief Init the gameObjects with a special type.
+     */
     void init_m_GameObjects() {
         m_gameObjects.clear();
-        int num_index = tanh(stage % 5 + 1);
+        int num_index = tanh((stage - 1) % 5 + 1);
         int num_gold = 3 + 8 * num_index + rand() % 3;
         int num_rock = 3 + 3 * num_index + rand() % 2;
         int num_diamond = num_index + rand() % 2;
@@ -1552,6 +1742,17 @@ private:
         initOneTypeOfGameObjects(num_rock_sml, GameObjectType::ROCK, RockRadiusType::SMALL, img_rock_small, mask_rock_small);
     }
 
+    /**
+     * @brief Init the gameObjects with a special type, served for the init_m_GameObjects().
+     * This function will init the gameObjects with a special type.
+     * It will detect whether the gameObjects is too close or out of bounds.
+     * If the gameObjects is too close or out of bounds, then the gameObjects will be reinitialized.
+     * @param num The number of this type of gameObjects.
+     * @param type The type of the gameObjects.
+     * @param radius The radius of the gameObjects.
+     * @param img The image of the gameObjects.
+     * @param mask The mask of the gameObjects.
+     */
     void initOneTypeOfGameObjects(int num, GameObjectType type, int radius, IMAGE& img, IMAGE& mask) {
         int x, y;
         GameObject obj;
@@ -1565,6 +1766,9 @@ private:
         }
     }
 
+    /**
+     * @brief Init 5 bombs list, with compact arrangement.
+     */
     void init_m_Boombs() {
         m_bombs.clear();
         for (int i = 0; i < 5; ++i) {
@@ -1573,6 +1777,16 @@ private:
         }
     }
 
+    /**
+     * @brief Detect whether the gameObjects is too close.
+     * This function will iterate over all elements in the gameObjects list.
+     * If the distance between the gameObjects and the gameObjects is less than the sum of the radius of the gameObjects, then return true.
+     * Otherwise, return false.
+     * @param x The x coordinate of the gameObjects.
+     * @param y The y coordinate of the gameObjects.
+     * @param radius The radius of the gameObjects.
+     * @return Whether the gameObjects is too close.
+     */
     bool isTooClose(int x, int y, int radius) {
         if (!m_gameObjects.empty()) {
             for (GameObject& obj : m_gameObjects) {
@@ -1585,6 +1799,14 @@ private:
         return false;
     }
 
+    /**
+     * @brief Detect whether the gameObjects is out of bounds.
+     * This function will detect whether the gameObjects is out of bounds.
+     * @param x The x coordinate of the gameObjects.
+     * @param y The y coordinate of the gameObjects.
+     * @param radius The radius of the gameObjects.
+     * @return Whether the gameObjects is out of bounds.
+     */
     bool outOfBounds(int x, int y, int radius) {
         if (WID - radius - 20 <= 20 || HEI - radius - 20 <= WID / 4) {
             std::cerr << "Error: bounds too small !" << std::endl;
@@ -1592,6 +1814,9 @@ private:
         return x < 20 || x > WID - radius - 20 || y < HEI / 4 || y > HEI - radius - 20;
     }
 
+    /**
+     * A function to manage the music for the gameObjects when it is 'scored'.
+     */
     void playMusicForGameObject(GameObject& obj) {
         if (obj.getType() == GameObjectType::GOLD) {
             playSpecialEffectMusic(musicPath_hook_gold);
@@ -1604,11 +1829,18 @@ private:
         }
     }
 
+    /**
+     * @brief Callback function for the quit button.
+     * This function will set the game scene to null scene, so as will exit the game.
+     */
     void callbackQuit() {
         setGameScene(GameSceneType::NULLSCENE);
     }
 };
 
+/**
+ * @brief The normal game type, with no special.
+ */
 class CGameNormal : public CGame {
 public:
     CGameNormal(const std::function<void(GameSceneType)>& setGameScene) : CGame(setGameScene) {}
@@ -1628,19 +1860,30 @@ public:
     }
 };
 
+/**
+ * @brief The stormy game type.
+ * This game type will continue to rain.
+ * The lightning will be generated every epochs.
+ * When the lightning is generated, the scene will be lighted.
+ * And after the lightning is over, the scene will be dark.
+ */
 class CGameStormy : public CGame {
 private:
     Rain rain;
     Lightning lightning;
-    int startTime = 3;
-    int stormyTime = 1;
-    int stormyInterval = 6;
-    bool dark = true;
-    bool thundering = false;
+    int startTime = 3;  // There will be 'startTime' light scene before the darkness fall.
+    int stormyTime = 1;  // The time of lightning to stay.
+    int stormyInterval = 6;  // The interval of lightning existing.
+    bool dark = true;  // Whether the scene is dark.
+    bool thundering = false;  // Whether the lightning is generated.
 
 public:
-    CGameStormy(const std::function<void(GameSceneType)>& setGameScene) : CGame(setGameScene) {void init();}
+    CGameStormy(const std::function<void(GameSceneType)>& setGameScene) : CGame(setGameScene) { void init(); }
 
+    /**
+     * @brief Init the stormy game.
+     * The stormyTime and stormyInterval will be set according to the stage.
+     */
     void init() {
         CGame::init();
         rain.init(350);
@@ -1678,25 +1921,34 @@ public:
         playBackgroundMusic(musicPath_background_stormy);
     }
 
+    /**
+     * @brief Update the stormy game.
+     */
     void update() {
         CGame::update();
         rain.update();
         lightning.update();
         if (m_clock.remainTime() + startTime < GAME_TIME && 
-            (m_clock.remainTime() + startTime) % (stormyTime + stormyInterval) > stormyTime) {
+            (m_clock.remainTime() + startTime) % (stormyTime + stormyInterval) > stormyTime) {  // If the darkness has not come, then stay light
+            //  ------**  The time is just like this, '-' means the darkness, '*' means the light. And loop through this process.
             thundering = false;
             dark = true;
         } else {
-            if (thundering == false) {
+            if (thundering == false) {  // Generate the lightning
                 playSpecialEffectMusic(musicPath_thunder);
                 thundering = true;
                 lightning.generateLightning();
             }
             dark = false;
         }
-        rain.setLightningActive(!dark);
+        rain.setLightningActive(!dark);  // Pass in the background darkness to the rain, so as to make the rain more visible.
     }
 
+    /**
+     * @brief Render the stormy game.
+     * If the scene is dark, then fill the screen with black, only the hook and explosion animation will be visible.
+     * If the scene is light, then render normal.
+     */
     void render() override {
         CGame::render();
         if (dark) {
@@ -1713,6 +1965,11 @@ public:
     }
 };
 
+/**
+ * @brief The quicksand game type.
+ * This game type will make the gameObjects submerge.
+ * The gameObjects will submerge faster when the stage is bigger.
+ */
 class CGameQuicksand : public CGame {
 private:
     int lastRemainTime = GAME_TIME;
@@ -1720,6 +1977,9 @@ private:
 public:
     CGameQuicksand(const std::function<void(GameSceneType)>& setGameScene) : CGame(setGameScene) {}
 
+    /**
+     * @brief This function will play the background music for the quicksand game.
+     */
     void init() {
         CGame::init();
         std::string outputText = "sorry, there're something wrong";
@@ -1746,6 +2006,12 @@ public:
         playBackgroundMusic(musicPath_background_quicksand);
     }
 
+    /**
+     * @brief Update the quicksand game.
+     * This function will update the gameObjects.
+     * The gameObjects will submerge faster when the stage is bigger.
+     * And the gameObjects will submerge faster if the stage is bigger.
+     */
     void update() {
         CGame::update();
         if (lastRemainTime != m_clock.remainTime()) {
@@ -1787,10 +2053,20 @@ public:
     }
 };
 
+/**
+ * @brief The magnetic game type.
+ * This game type will make a magnetic resource on the bottom of the screen.
+ * The hook will be attracted to the magnetic resource.
+ * The magnetic force will be stronger when the stage is bigger.
+ * The magnetic force will after 19.
+ */
 class CGameMagnetic : public CGame {
 public:
     CGameMagnetic(const std::function<void(GameSceneType)>& setGameScene) : CGame(setGameScene) {}
 
+    /**
+     * @brief This function will play the background music for the magnetic game.
+     */
     void init() {
         CGame::init();
         std::string outputText = "sorry, there're something wrong";
@@ -1817,6 +2093,13 @@ public:
         playBackgroundMusic(musicPath_background_normal);
     }
 
+    /**
+     * @brief Update the magnetic game.
+     * This function will update the hook.
+     * The hook will be attracted to the magnetic resource.
+     * The magnetic force will be stronger when the stage is bigger.
+     * The magnetic force will after 19.
+     */
     void update() {
         double magnetic_index = 10 - m_clock.remainTime() / 10;
         CGame::update();
@@ -1849,6 +2132,10 @@ public:
     }
 };
 
+/**
+ * @brief The game factory class.
+ * This class will create the game scene according to the stage.
+ */
 class CGameFactory {
     public:
         static CGame* createGame(GameStageType type, const std::function<void(GameSceneType)>& setGameScene) {
@@ -1867,6 +2154,10 @@ class CGameFactory {
         }
     };
 
+/**
+ * @brief The win scene class.
+ * This class will render scene if you win.
+ */
 class CWin : public CScene {
 private:
     CButton m_button_continue;
@@ -1877,6 +2168,10 @@ public:
         m_button_continue(0.665 * WID, 0.51375 * HEI, 0.29 * WID, 0.15 * HEI, "Continue", std::bind(&CWin::callbackContinue, this)),
         m_button_quit(0.665 * WID, 0.70875 * HEI, 0.29 * WID, 0.15 * HEI, "Quit", std::bind(&CWin::callbackQuit, this)) {}
 
+    /**
+     * @brief Update the win scene.
+     * This function will update the buttons.
+     */
     void update() override {
         MOUSEMSG m;
         if (MouseHit()) {
@@ -1886,6 +2181,9 @@ public:
         }
     }
 
+    /**
+     * @brief Render the win scene.
+     */
     void render() override {
         cleardevice();
         putimage(0, 0, &img_game_win);
@@ -1895,19 +2193,33 @@ public:
     }
 
 private:
+    /**
+     * @brief Callback function for the continue button.
+     * This function will set the game scene to game scene if the game is not over.
+     * Otherwise, set the game scene to over scene.
+     */
     void callbackContinue() {
         if (stage >= 20) {
+            stage = 21;
             setGameScene(GameSceneType::OVER);
         } else {
             setGameScene(GameSceneType::GAME);
         }
     }
     
+    /**
+     * @brief Callback function for the quit button.
+     * This function will set the game scene to null scene, so as will exit the game.
+     */
     void callbackQuit() {
         setGameScene(GameSceneType::NULLSCENE);
     }
 };
 
+/**
+ * @brief The lose scene class.
+ * This class will render scene if you lose.
+ */
 class CLose : public CScene {
 private:
     CButton m_button_retry;
@@ -1917,6 +2229,10 @@ public:
         m_button_retry(0.6725 * WID, 0.12625 * HEI, 0.29 * WID, 0.15 * HEI, "Retry", std::bind(&CLose::callbackRetry, this)),
         m_button_quit(0.6725 * WID, 0.3 * HEI, 0.29 * WID, 0.15 * HEI, "Quit", std::bind(&CLose::callbackQuit, this)) {}
 
+    /**
+     * @brief Update the lose scene.
+     * This function will update the buttons.
+     */
     void update() override {
         MOUSEMSG m;
         if (MouseHit()) {
@@ -1926,21 +2242,30 @@ public:
         }
     }
 
+    /**
+     * @brief Render the lose scene.
+     */
     void render() override {
         cleardevice();
         putimage(0, 0, &img_game_lose);
         setbkmode(TRANSPARENT);
         settextstyle(40, 0, _T("宋体"));
         settextcolor(BLACK);
-        // m_button_retry.draw();
-        // m_button_quit.draw();
     }
 
 private:
+    /**
+     * @brief Callback function for the retry button.
+     * This function will set the game scene to game scene, you will retry this stage.
+     */
     void callbackRetry() {
         setGameScene(GameSceneType::GAME);
     }
 
+    /**
+     * @brief Callback function for the quit button.
+     * This function will set the game scene to null scene, so as will exit the game.
+     */
     void callbackQuit() {
         setGameScene(GameSceneType::NULLSCENE);
     }
@@ -1948,11 +2273,16 @@ private:
 
 class COver : public CScene {
 private:
-    int y = 0;
+    int y = 0;  // The y coordinate of the game over image
 
 public:
     COver(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene) {}
 
+    /**
+     * @brief Update the over scene.
+     * This function will update the y coordinate of the game over image.
+     * And if the mouse is clicked, then set the game scene to null scene, so as will exit the game.
+     */
     void update() override {
         if (MouseHit()) {
             MOUSEMSG m = GetMouseMsg();
@@ -1965,22 +2295,29 @@ public:
         }
     }
 
+    /**
+     * @brief Scroll through the end screen.
+     */
     void render() override {
         cleardevice();
         putimage(0, y, &img_game_over);
     }    
 };
 
+/**
+ * @brief The game class.
+ * This class will manage all the game scene.
+ */
 class Game {
 private:
-    GameSceneType m_game_scene;
-    CMenu m_menu;
-    CSignin m_signin;
-    CLogin m_login;
-    CGame* m_game = nullptr;
-    CWin m_win;
-    CLose m_lose;
-    COver m_over;
+    GameSceneType m_game_scene;  // The current game scene
+    CMenu m_menu;                // The menu scene
+    CSignin m_signin;            // The signin scene
+    CLogin m_login;              // The login scene
+    CGame* m_game = nullptr;     // The game scene
+    CWin m_win;                  // The win scene
+    CLose m_lose;                // The lose scene
+    COver m_over;                // The over scene
 
 public:
     Game(): m_game_scene(GameSceneType::GAME),
@@ -1995,6 +2332,10 @@ public:
                 loadIMAGE();
             }
 
+    /**
+     * @brief Run the game.
+     * This function will run the game.
+     */
     void run() {
         if (proofreadIMAGE()) {
             initgraph(WID, HEI);
@@ -2060,6 +2401,10 @@ public:
     }
 
 private:
+    /**
+     * @brief Load the image and mask path.
+     * This function will load the image and mask path.
+     */
     bool loadTEXT() {
         std::ifstream file(filePath);
         if (!file.is_open()) {
@@ -2085,6 +2430,10 @@ private:
         return true;
     }
 
+    /**
+     * @brief Set the image and mask path for the explosion.
+     * This function will set the image and mask path for the explosion.
+     */
     void setImageExplosivePath() {
         for (int i = 0; i < 9; ++i) {
             std::string imgPath ="res/explosion/explosion_0" + std::to_string(i + 1) + ".jpg";
@@ -2094,6 +2443,10 @@ private:
         }
     }
 
+    /**
+     * @brief Load the image and mask.
+     * This function will load the image and mask.
+     */
     void loadIMAGE() {
         loadimage(&img_startup, imgPath_startup.c_str(), WID, HEI, true);    
         loadimage(&img_signin, imgPath_signin.c_str(), WID, HEI, true);
@@ -2132,6 +2485,11 @@ private:
         }
     }
 
+    /**
+     * @brief Proofread the image and mask.
+     * This function will proofread the image and mask by it's size.
+     * If the image and mask are not loaded successfully, then return false.
+     */
     bool proofreadIMAGE() {
         if (img_startup.getwidth() != WID || img_startup.getheight() != HEI) {
             std::cerr << "Failed to load img_startup!" << std::endl;
@@ -2228,13 +2586,16 @@ private:
         return true;
     }
 
+    /**
+     * @brief Write the information of all the users into the file.
+     */
     void writeTEXT() {
-        for (int i = 0; i < storedUsername.size(); ++i) {
+        for (int i = 0; i < storedUsername.size(); ++i) {  // First add the current user's information into the linked list
             if (username == storedUsername[i]) {
                 storedStage[i] = stage;
                 break;
             }
-            if (i == storedUsername.size() - 1) {
+            if (i == storedUsername.size() - 1) {  // If the current user is not in the linked list, then there must be a mistake in the code
                 std::cerr << "Failed to find username: " << username << " when writing into the file." << std::endl;
                 return;
             }
