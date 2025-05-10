@@ -85,6 +85,9 @@ std::string musicPath_background_normal = "res/music_background_normal.mp3";
 std::string musicPath_background_stormy = "res/music_background_stormy.mp3";
 std::string musicPath_background_quicksand = "res/music_background_quicksand.mp3";
 std::string musicPath_background_magnetic = "res/music_background_magnetic.mp3";
+std::string musicPath_background_win = "res/music_background_win.mp3";
+std::string musicPath_background_lose = "res/music_background_lose.mp3";
+std::string musicPath_background_over = "res/music_background_normal.mp3";
 
 // Background sound effects
 std::string musicPath_bomb_explosive = "res/music_bomb_explosive.mp3";
@@ -145,6 +148,8 @@ const int BOMB_W = 15;
 const int BOMB_H = 30;
 const int GAME_TIME = 99;
 const std::time_t EXPLOSION_TIME = 1000;  // Burst frame animation duration
+
+ArchivedInformation information = NULL;
 
 struct GoldRadiusType {
     static constexpr int BIG = 75;
@@ -267,8 +272,8 @@ public:
      * @brief Initialize the score with the goal.
      * @param goal The score player needs to reach to win the game.
      */
-    void init(int goal) {
-        score = 0;
+    void init(int score, int goal) {
+        this->score = score;
         this->goal = goal;
         displayScore = std::to_string(score);
         displayGoal = std::to_string(goal);
@@ -697,14 +702,16 @@ public:
         return (!isMoving) && (!isRetracting) && (length <= HOOK_LENGTH);
     }
 
-    /**
-     * @brief Set the speed of the hook.
-     * Usually, when there is somethinng hooked, the speed will be set to the object's speed.
-     * And when the hook is back, the speed will be set to the original speed.
-     * @param speed The speed of the hook.
-     */
     void setSpeed(int speed) {
         this->speed = speed;
+    }
+
+    void setAngle(double angle) {
+        this->angle = angle;
+    }
+
+    void setAngleSpeed(double angleSpeed) {
+        this->angleSpeed = angleSpeed;
     }
 
     /**
@@ -732,35 +739,18 @@ public:
         isRetracting = false;
     }
     
-    /**
-     * @brief Get the end point x of the line.
-     * @return The end point x of the line.
-     */
     int getEndX() const {
         return endX;
     }
 
-    /**
-     * @brief Get the end point y of the line.
-     * @return The end point y of the line.
-     */
     int getEndY() const {
         return endY;
     }
 
-    /**
-     * @brief Get the length of the line.
-     * Usually for adjust whether the hook is back.
-     * @return The length of the line.
-     */
     int getLength() const {
         return length;
     }
 
-    /**
-     * @brief Get the angle of the line.
-     * @return The angle of the line.
-     */
     double getAngle() const {
         return angle;
     }   
@@ -1476,6 +1466,7 @@ private:
                 if (stage > 20) {
                     stage = 1;
                 }
+                loadArchivedInformation(information);
                 setGameScene(GameSceneType::GAME);
                 return;
             }
@@ -1496,6 +1487,77 @@ IMAGE img_null;  // A null image for the null object
 GameObject nullObject(GameObjectType::GOLD, 0, 0, GoldRadiusType::BIG, img_null, img_null);  // A null object for the 'null' pointer
 LinkedList<CBomb> m_bombs;             // A linked list to store every bombs
 LinkedList<GameObject> m_gameObjects;  // A linked list to store every game objects
+
+typedef struct {
+    GameObjectType type;
+    int x;
+    int y;
+    int radiusType;
+} ArchivedGameObject;
+
+typedef struct {
+    int m_clock_remainingTime;
+    int m_score_score;
+    int m_hook_angelSpeed;
+    int m_hook_angel;
+    bool countdown;
+    int m_bomb_num;
+    LinkedList<ArchivedGameObject> m_gameObjects;
+} ArchivedInformation;
+
+/**
+ * @brief The game scene.
+ * This scene is the main scene of the game.
+ */
+void loadArchivedInformation(ArchivedInformation& reader) {
+    std::string filePath = "users_archive/" + username + ".txt";
+    std::ifstream file(filePath);
+    if (file.is_open()) {
+        if (file.peek() == std::ifstream::traits_type::eof()) {
+            file.close();
+        }
+        file >> reader.m_clock_remainingTime;
+        file >> reader.m_score_score;
+        file >> reader.m_hook_angelSpeed;
+        file >> reader.m_hook_angel;
+        file >> reader.countdown;
+        file >> reader.m_bomb_num;
+        while (!file.eof()) {
+            ArchivedGameObject reader_gameObject;
+            file >> reader_gameObject.type;
+            file >> reader_gameObject.x;
+            file >> reader_gameObject.y;
+            file >> reader_gameObject.radiusType;
+            reader.m_gameObjects.push_back(reader_gameObject);
+        }
+        file.close();
+        remove(filePath.c_str()); 
+    }
+}
+
+/**
+ * @brief Save the archived information.
+ * This function will save the archived information in the file.
+ * @param writer The archived information.
+ */
+void saveArchivedInformation(ArchivedInformation& writer) {
+    std::string filePath = "users_archive/" + username + ".txt";
+    std::ofstream file(filePath);
+    if (file.is_open()) {
+        file << writer.m_clock_remainingTime << std::endl;
+        file << writer.m_score_score << std::endl;
+        file << writer.m_hook_angelSpeed << std::endl;
+        file << writer.m_hook_angel << std::endl;
+        file << writer.countdown << std::endl;
+        file << writer.m_bomb_num << std::endl;
+        for (ArchivedGameObject& obj : writer.m_gameObjects) {
+            file << obj.type << std::endl;
+            file << obj.x << std::endl;
+            file << obj.y << std::endl;
+            file << obj.radiusType << std::endl;
+        }
+    }
+}
 
 class CGame : public CScene {
 protected:
@@ -1519,15 +1581,26 @@ public:
      * This function will initialize all the components and gameObjects in the game.
      */
     virtual void init() {
-        m_gameObjects.clear();
-        m_stage.init(stage);
-        m_clock.init(GAME_TIME);
-        m_score.init(1000 + ((stage - 1) % 5 + 1) * 500);
-        m_miner.init(img_goldminer_1, mask_goldminer_1, img_goldminer_2, mask_goldminer_2);
         m_hook.init(img_hook, mask_hook);
         m_bomb.init(img_bomb, mask_bomb);
-        init_m_GameObjects();
+        m_miner.init(img_goldminer_1, mask_goldminer_1, img_goldminer_2, mask_goldminer_2);
         init_m_Boombs();
+        if (information == NULL) {
+            m_gameObjects.clear();
+            m_stage.init(stage);
+            m_clock.init(GAME_TIME);
+            m_score.init(0, 1000 + ((stage - 1) % 5 + 1) * 500);
+            init_m_GameObjects();
+        } else {
+            m_gameObjects.clear();
+            m_stage.init(stage);
+            m_clock.init(information.m_clock_remainingTime);
+            m_score.init(information.m_score_score, 1000 + ((stage - 1) % 5 + 1) * 500);
+            m_hook.setAngel(information.m_hook_angel);
+            m_hook.setAngelSpeed(information.m_hook_angelSpeed);
+            countdown = information.countdown;
+            init_m_GameObjects();
+        }
     }
 
     void update() override {
@@ -1605,7 +1678,7 @@ private:
                 m_hook.move();
                 m_miner.work();
                 playSpecialEffectMusic(musicPath_hook_goingOut);
-            } else if (ch == L'\b') {  // when the user press "backspace", the last character will be deleted if there is any
+            } else if (ch == L'\b' || ch == L'b' || ch == L'B') {  // when the user press "backspace", the last character will be deleted if there is any
                 if (m_hook.isGoingBack() && m_bombs.size() > 0) {
                     m_hook.setSpeed(HOOK_SPEED);
                     if (m_focusedGameObject != &nullObject) {
@@ -1629,9 +1702,15 @@ private:
                             return;
                         } else if (ch == L'p' || ch == L'P') {
                             break;
+                        } else if (ch == L'a' || ch == L'A') {
+                            archiveInformation();
+                            saveArchivedInformation(information);
                         }
                     }
                 }
+            } else if (ch == L'a' || ch == L'A') {
+                archiveInformation();
+                saveArchivedInformation(information);
             }
         }
     }
@@ -1714,32 +1793,65 @@ private:
      */
     void init_m_GameObjects() {
         m_gameObjects.clear();
-        int num_index = tanh((stage - 1) % 5 + 1);
-        int num_gold = 3 + 8 * num_index + rand() % 3;
-        int num_rock = 3 + 3 * num_index + rand() % 2;
-        int num_diamond = num_index + rand() % 2;
-        while (1000 * num_diamond + 320 * num_gold + 75 * num_rock - m_score.getGoal() < 500) {
-            int random = rand() % 20;
-            if (random == 0) {
-                ++ num_diamond;
-            } else if (random < 8) {
-                ++ num_gold;
-            } else {
-                ++ num_rock;
+        if (information == NULL) {
+            int num_index = tanh((stage - 1) % 5 + 1);
+            int num_gold = 3 + 8 * num_index + rand() % 3;
+            int num_rock = 3 + 3 * num_index + rand() % 2;
+            int num_diamond = num_index + rand() % 2;
+            while (1000 * num_diamond + 320 * num_gold + 75 * num_rock - m_score.getGoal() < 500) {
+                int random = rand() % 20;
+                if (random == 0) {
+                    ++ num_diamond;
+                } else if (random < 8) {
+                    ++ num_gold;
+                } else {
+                    ++ num_rock;
+                }
+            }
+            int num_gold_big = num_gold * 0.3;
+            int num_gold_mid = num_gold * 0.5;
+            int num_gold_sml = num_gold * 0.2;
+            int num_rock_mid = num_rock * 0.5;
+            int num_rock_sml = num_rock * 0.5;
+
+            initOneTypeOfGameObjects(num_diamond, GameObjectType::TREASURE, TreasureRadiusType::DIAMOND, img_diamond, mask_diamond);
+            initOneTypeOfGameObjects(num_gold_big, GameObjectType::GOLD, GoldRadiusType::BIG, img_gold_big, mask_gold_big);
+            initOneTypeOfGameObjects(num_gold_mid, GameObjectType::GOLD, GoldRadiusType::MID, img_gold_mid, mask_gold_mid);
+            initOneTypeOfGameObjects(num_gold_sml, GameObjectType::GOLD, GoldRadiusType::SMALL, img_gold_small, mask_gold_small);
+            initOneTypeOfGameObjects(num_rock_mid, GameObjectType::ROCK, RockRadiusType::MID, img_rock_mid, mask_rock_mid);
+            initOneTypeOfGameObjects(num_rock_sml, GameObjectType::ROCK, RockRadiusType::SMALL, img_rock_small, mask_rock_small);   
+        } else {
+            IMAGE img;
+            IMAGE mask;
+            GameObject obj;
+            for (ArchivedGameObject& reader_gameObject : information.m_gameObjects) {
+                if (reader_gameObject.type == GameObjectType::GOLD) {
+                    if (reader_gameObject.radiusType == GoldRadiusType::BIG) {
+                        img = img_gold_big;
+                        mask = mask_gold_big;
+                    } else if (reader_gameObject.radiusType == GoldRadiusType::MID) {
+                        img = img_gold_mid;
+                        mask = mask_gold_mid;
+                    } else {
+                        img = img_gold_small;
+                        mask = mask_gold_small;
+                    }
+                } else if (reader_gameObject.type == GameObjectType::ROCK) {
+                    if (reader_gameObject.radiusType == RockRadiusType::MID) {
+                        img = img_rock_mid;
+                        mask = mask_rock_mid;
+                    } else {
+                        img = img_rock_small;
+                        mask = mask_rock_small;
+                    }
+                } else {
+                    img = img_diamond;
+                    mask = mask_diamond;
+                }
+                obj = GameObjectFactory::createGameObject(reader_gameObject.type, reader_gameObject.x, reader_gameObject.y, reader_gameObject.radiusType, img, mask);
+                m_gameObjects.push_back(obj);
             }
         }
-        int num_gold_big = num_gold * 0.3;
-        int num_gold_mid = num_gold * 0.5;
-        int num_gold_sml = num_gold * 0.2;
-        int num_rock_mid = num_rock * 0.5;
-        int num_rock_sml = num_rock * 0.5;
-
-        initOneTypeOfGameObjects(num_diamond, GameObjectType::TREASURE, TreasureRadiusType::DIAMOND, img_diamond, mask_diamond);
-        initOneTypeOfGameObjects(num_gold_big, GameObjectType::GOLD, GoldRadiusType::BIG, img_gold_big, mask_gold_big);
-        initOneTypeOfGameObjects(num_gold_mid, GameObjectType::GOLD, GoldRadiusType::MID, img_gold_mid, mask_gold_mid);
-        initOneTypeOfGameObjects(num_gold_sml, GameObjectType::GOLD, GoldRadiusType::SMALL, img_gold_small, mask_gold_small);
-        initOneTypeOfGameObjects(num_rock_mid, GameObjectType::ROCK, RockRadiusType::MID, img_rock_mid, mask_rock_mid);
-        initOneTypeOfGameObjects(num_rock_sml, GameObjectType::ROCK, RockRadiusType::SMALL, img_rock_small, mask_rock_small);
     }
 
     /**
@@ -1771,7 +1883,8 @@ private:
      */
     void init_m_Boombs() {
         m_bombs.clear();
-        for (int i = 0; i < 5; ++i) {
+        int num_bomb = information == NULL ? 5 : information.m_bomb_num;
+        for (int i = 0; i < num_bomb; ++i) {
             m_bomb.setXY(0.56 * WID + BOMB_W * i, MINER_Y + MINER_H - BOMB_H);
             m_bombs.push_back(m_bomb);
         }
@@ -1826,6 +1939,24 @@ private:
             playSpecialEffectMusic(musicPath_hook_treasure);
         } else {
             std::cerr << std::endl << "Error: GameObject type not recognized!" << std::endl;
+        }
+    }
+
+    void archiveInformation() {
+        information.m_clock_remainingTime = m_clock.remainTime();
+        information.m_score_score = m_score.getScore();
+        information.m_hook_angelSpeed = m_hook.getAngelSpeed();
+        information.m_hook_angel = m_hook.getAngel();
+        information.countdown = countdown;
+        information.m_bomb_num = m_bombs.size();
+        information.m_gameObjects.clear();
+        for (GameObject& obj : m_gameObjects) {
+            ArchivedGameObject writer_gameObject;
+            writer_gameObject.type = obj.getType();
+            writer_gameObject.x = obj.getRx();
+            writer_gameObject.y = obj.getRy();
+            writer_gameObject.radiusType = obj.getRadiusType();
+            information.m_gameObjects.push_back(writer_gameObject);
         }
     }
 
@@ -2169,6 +2300,14 @@ public:
         m_button_quit(0.665 * WID, 0.70875 * HEI, 0.29 * WID, 0.15 * HEI, "Quit", std::bind(&CWin::callbackQuit, this)) {}
 
     /**
+     * @brief Init the win scene.
+     * This function will play the background music for the win scene.
+     */
+    void init() override {
+        playBackgroundMusic(musicPath_background_win);
+    }
+
+    /**
      * @brief Update the win scene.
      * This function will update the buttons.
      */
@@ -2230,6 +2369,14 @@ public:
         m_button_quit(0.6725 * WID, 0.3 * HEI, 0.29 * WID, 0.15 * HEI, "Quit", std::bind(&CLose::callbackQuit, this)) {}
 
     /**
+     * @brief Init the lose scene.
+     * This function will play the background music for the lose scene.
+     */
+    void init() override {
+        playBackgroundMusic(musicPath_background_lose);
+    }
+
+    /**
      * @brief Update the lose scene.
      * This function will update the buttons.
      */
@@ -2279,6 +2426,14 @@ public:
     COver(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene) {}
 
     /**
+     * @brief Init the over scene.
+     * This function will play the background music for the over scene.
+     */
+    void init() override {
+        playBackgroundMusic(musicPath_background_over);
+    }
+
+    /**
      * @brief Update the over scene.
      * This function will update the y coordinate of the game over image.
      * And if the mouse is clicked, then set the game scene to null scene, so as will exit the game.
@@ -2318,6 +2473,7 @@ private:
     CWin m_win;                  // The win scene
     CLose m_lose;                // The lose scene
     COver m_over;                // The over scene
+    bool m_isOverInit = false;   // Whether the over scene is initialized
 
 public:
     Game(): m_game_scene(GameSceneType::GAME),
@@ -2355,6 +2511,7 @@ public:
                         m_login.render();
                         break;
                     case GameSceneType::GAME:
+                        m_isOverInit = false;
                         if (m_game == nullptr) {
                             if (stage < 6) {
                                 m_game = CGameFactory::createGame(GameStageType::NORMAL, [this](GameSceneType scene) { this->m_game_scene = scene; });
@@ -2371,16 +2528,28 @@ public:
                         m_game->render();
                         break;
                     case GameSceneType::WIN:
+                        if (!m_isOverInit) {
+                            m_win.init();
+                            m_isOverInit = true;
+                        }
                         m_win.update();
                         m_win.render();
                         m_game = nullptr;
                         break;
                     case GameSceneType::LOSE:
+                        if (!m_isOverInit) {
+                            m_lose.init();
+                            m_isOverInit = true;
+                        }
                         m_lose.update();
                         m_lose.render();
                         m_game = nullptr;
                         break;
                     case GameSceneType::OVER:
+                        if (!m_isOverInit) {
+                            m_over.init();
+                            m_isOverInit = true;
+                        }
                         m_over.update();
                         m_over.render();
                         m_game = nullptr;
