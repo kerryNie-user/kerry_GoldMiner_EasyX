@@ -44,7 +44,7 @@ LinkedList<int> storedStage;             // All the stages in the file
 
 std::string username = "kerry";  // Focused user's username
 std::string password = "kerry";  // Focused user's password
-int stage = 1;                   // Focused user's stage
+int stage = 5;                   // Focused user's stage
 
 std::string filePath = "users.txt";
 std::string imgPath_startup = "res/img_startup.jpg";
@@ -75,6 +75,8 @@ std::string maskPath_bomb = "res/img_bomb_mask.jpg";
 std::string imgPath_game_win = "res/img_game_win.jpg";
 std::string imgPath_game_lose = "res/img_game_lose.jpg";
 std::string imgPath_game_over = "res/img_game_over.jpeg";
+std::string imgPath_stoneStab = "res/img_stoneStab.jpg";
+std::string maskPath_stoneStab = "res/img_stoneStab_mask.jpg";
 
 // Explosion effect frame animation
 LinkedList<std::string> imgPath_explosive;
@@ -126,6 +128,8 @@ IMAGE mask_bomb;
 IMAGE img_game_win;
 IMAGE img_game_lose;
 IMAGE img_game_over;
+IMAGE img_stoneStab;
+IMAGE mask_stoneStab;
 
 // Explosion effect frame animation picture
 LinkedList<IMAGE> img_explosive;
@@ -146,10 +150,8 @@ const int HOOK_SPEED = SLEEP_TIME * 0.7;  // Speed of the hook when going out
 const int HOOKED_SIZE = 40;  // To detect if the object is hooked
 const int BOMB_W = 15;
 const int BOMB_H = 30;
-const int GAME_TIME = 99;
+const int GAME_TIME = 100;
 const std::time_t EXPLOSION_TIME = 1000;  // Burst frame animation duration
-
-ArchivedInformation information = NULL;
 
 struct GoldRadiusType {
     static constexpr int BIG = 75;
@@ -192,6 +194,85 @@ enum class GameStageType {
     MAGNETIC
 };
 
+typedef struct {
+    GameObjectType type;
+    int x;
+    int y;
+    int radiusType;
+} ArchivedGameObject;
+
+typedef struct {
+    int m_clock_remainingTime;
+    int m_score_score;
+    int m_hook_angelSpeed;
+    int m_hook_angel;
+    bool countdown;
+    int m_bomb_num;
+    LinkedList<ArchivedGameObject> m_gameObjects;
+} ArchivedInformation;
+
+/**
+ * @brief The game scene.
+ * This scene is the main scene of the game.
+ */
+void loadArchivedInformation(ArchivedInformation& reader) {
+    std::string filePath = "users_archive/" + username + ".txt";
+    std::ifstream file(filePath);
+    if (file.is_open()) {
+        if (file.peek() == std::ifstream::traits_type::eof()) {
+            file.close();
+        }
+        file >> reader.m_clock_remainingTime;
+        file >> reader.m_score_score;
+        file >> reader.m_hook_angelSpeed;
+        file >> reader.m_hook_angel;
+        file >> reader.countdown;
+        file >> reader.m_bomb_num;
+        while (!file.eof()) {
+            ArchivedGameObject reader_gameObject;
+            std::string type;
+            file >> type;
+            type == "GOLD" ? reader_gameObject.type = GameObjectType::GOLD
+                  : "ROCK" ? reader_gameObject.type = GameObjectType::ROCK
+                  : reader_gameObject.type = GameObjectType::TREASURE;
+            file >> reader_gameObject.x;
+            file >> reader_gameObject.y;
+            file >> reader_gameObject.radiusType;
+            reader.m_gameObjects.push_back(reader_gameObject);
+        }
+        file.close();
+        remove(filePath.c_str()); 
+    }
+}
+
+/**
+ * @brief Save the archived information.
+ * This function will save the archived information in the file.
+ * @param writer The archived information.
+ */
+void saveArchivedInformation(ArchivedInformation& writer) {
+    std::string filePath = "users_archive/" + username + ".txt";
+    remove(filePath.c_str());
+    std::ofstream file(filePath);
+    if (file.is_open()) {
+        file << writer.m_clock_remainingTime << std::endl;
+        file << writer.m_score_score << std::endl;
+        file << writer.m_hook_angelSpeed << std::endl;
+        file << writer.m_hook_angel << std::endl;
+        file << writer.countdown << std::endl;
+        file << writer.m_bomb_num << std::endl;
+        for (ArchivedGameObject& obj : writer.m_gameObjects) {
+            std::string type = obj.type == GameObjectType::GOLD ? "GOLD" : obj.type == GameObjectType::ROCK ? "ROCK" : "TREASURE";
+            file << type << std::endl;
+            file << obj.x << std::endl;
+            file << obj.y << std::endl;
+            file << obj.radiusType << std::endl;
+        }
+    }
+}
+
+ArchivedInformation* information = nullptr;
+
 class Clock {
 private:
     int x, y, w, h;  // Coordinates and dimensions of the clock
@@ -200,6 +281,9 @@ private:
     int remain;  // Remaining time
     bool gameContinue;  // Flag to check if the game is still ongoing
     std::string display;  // Display remaining time
+    time_t stop_stamp_start = 0;
+    time_t stop_stamp_end = 0;
+    int stop_total = 0;
 
 public:
     Clock () {}
@@ -231,7 +315,7 @@ public:
      */
     void update () {
         int elapsed = (clock() - start) / CLOCKS_PER_SEC;
-        remain = total - elapsed;
+        remain = total - elapsed + stop_total;
         if (remain <= 0) {
             remain = 0;
             gameContinue = false;
@@ -255,6 +339,17 @@ public:
      */
     int remainTime() {
         return remain;
+    }
+
+    void setStopType() {
+        stop_stamp_start = time(nullptr);
+    }
+
+    void setContinueType() {
+        stop_stamp_end = time(nullptr);
+        stop_total += (int)(stop_stamp_end - stop_stamp_start);
+        stop_stamp_start = 0;
+        stop_stamp_end = 0;
     }
 };
 
@@ -312,12 +407,12 @@ public:
         return score >= goal;
     }
 
-    /**
-     * @brief Get the current score.
-     * @return The current score.
-     */
     int getGoal() {
         return goal;
+    }
+
+    int getScore() {
+        return score;
     }
 };
 
@@ -478,21 +573,21 @@ public:
     }
 };
 
+/**
+ * @brief Put the image with the mask on the screen.
+ * @param img The image to be put.
+ * @param mask The mask of the image.
+ * @param x The x coordinate of the image.
+ * @param y The y coordinate of the image.
+ */
+void putimgwithmask(IMAGE& img, IMAGE& mask, int x, int y) {
+    putimage(x, y, &mask, NOTSRCERASE);
+    putimage(x, y, &img, SRCINVERT);
+}
+
 class CObject {
 protected:
     virtual void draw() = 0;
-
-    /**
-     * @brief Put the image with the mask on the screen.
-     * @param img The image to be put.
-     * @param mask The mask of the image.
-     * @param x The x coordinate of the image.
-     * @param y The y coordinate of the image.
-     */
-    void putimgwithmask(IMAGE& img, IMAGE& mask, int x, int y) const {
-        putimage(x, y, &mask, NOTSRCERASE);
-        putimage(x, y, &img, SRCINVERT);
-    }
 };
 
 class CMiner : public CObject {
@@ -588,7 +683,7 @@ private:
     IMAGE img_rotate, mask_rotate;  // The rotated image and mask of the hook
 
 public:
-    CHook() : x(HOOK_X), y(HOOK_Y), length(HOOK_LENGTH), speed(HOOK_SPEED), angleSpeed(SLEEP_TIME * 0.15), rotate(true) {}
+    CHook() : x(HOOK_X), y(HOOK_Y), length(HOOK_LENGTH), speed(HOOK_SPEED), angleSpeed(SLEEP_TIME * 0.15) {}
 
     /**
      * @brief Initialize the hook with the image and mask.
@@ -704,6 +799,14 @@ public:
 
     void setSpeed(int speed) {
         this->speed = speed;
+    }
+
+    double getAngle() {
+        return angle;
+    }
+
+    double getAngleSpeed() {
+        return angleSpeed;
     }
 
     void setAngle(double angle) {
@@ -1194,20 +1297,14 @@ protected:
      */
     void outputStatus(std::string text) {
         setbkmode(TRANSPARENT);
-        setbkcolor(WHITE);
         settextstyle(40, 0, _T("黑体"));
         settextcolor(BLACK);
-        int textX = 0.5 * WID - (textwidth(_T(text).c_str())) / 2;
-        int textY = 0.59 * HEI - (textheight(_T(text).c_str())) / 2;
-        fillrectangle(textX, textY, textX + textwidth(_T(text).c_str()), textY + textheight(_T(text).c_str()));
+        int textX = (WID - (textwidth(_T(text).c_str()))) / 2;
+        int textY = (HEI - (textheight(_T(text).c_str()))) / 2;
+        putimgwithmask(img_stoneStab, mask_stoneStab, (WID - img_stoneStab.getwidth()) / 2, (HEI - img_stoneStab.getheight()) / 2);
         outtextxy(textX, textY, _T(text).c_str());
         FlushBatchDraw();
-        while(true) {
-            MOUSEMSG m = GetMouseMsg();
-            if (m.uMsg == WM_LBUTTONDOWN) {
-                break;
-            }
-        }
+        Sleep(1000);
     }
 
     /**
@@ -1466,7 +1563,7 @@ private:
                 if (stage > 20) {
                     stage = 1;
                 }
-                loadArchivedInformation(information);
+                loadArchivedInformation(*information);
                 setGameScene(GameSceneType::GAME);
                 return;
             }
@@ -1487,77 +1584,6 @@ IMAGE img_null;  // A null image for the null object
 GameObject nullObject(GameObjectType::GOLD, 0, 0, GoldRadiusType::BIG, img_null, img_null);  // A null object for the 'null' pointer
 LinkedList<CBomb> m_bombs;             // A linked list to store every bombs
 LinkedList<GameObject> m_gameObjects;  // A linked list to store every game objects
-
-typedef struct {
-    GameObjectType type;
-    int x;
-    int y;
-    int radiusType;
-} ArchivedGameObject;
-
-typedef struct {
-    int m_clock_remainingTime;
-    int m_score_score;
-    int m_hook_angelSpeed;
-    int m_hook_angel;
-    bool countdown;
-    int m_bomb_num;
-    LinkedList<ArchivedGameObject> m_gameObjects;
-} ArchivedInformation;
-
-/**
- * @brief The game scene.
- * This scene is the main scene of the game.
- */
-void loadArchivedInformation(ArchivedInformation& reader) {
-    std::string filePath = "users_archive/" + username + ".txt";
-    std::ifstream file(filePath);
-    if (file.is_open()) {
-        if (file.peek() == std::ifstream::traits_type::eof()) {
-            file.close();
-        }
-        file >> reader.m_clock_remainingTime;
-        file >> reader.m_score_score;
-        file >> reader.m_hook_angelSpeed;
-        file >> reader.m_hook_angel;
-        file >> reader.countdown;
-        file >> reader.m_bomb_num;
-        while (!file.eof()) {
-            ArchivedGameObject reader_gameObject;
-            file >> reader_gameObject.type;
-            file >> reader_gameObject.x;
-            file >> reader_gameObject.y;
-            file >> reader_gameObject.radiusType;
-            reader.m_gameObjects.push_back(reader_gameObject);
-        }
-        file.close();
-        remove(filePath.c_str()); 
-    }
-}
-
-/**
- * @brief Save the archived information.
- * This function will save the archived information in the file.
- * @param writer The archived information.
- */
-void saveArchivedInformation(ArchivedInformation& writer) {
-    std::string filePath = "users_archive/" + username + ".txt";
-    std::ofstream file(filePath);
-    if (file.is_open()) {
-        file << writer.m_clock_remainingTime << std::endl;
-        file << writer.m_score_score << std::endl;
-        file << writer.m_hook_angelSpeed << std::endl;
-        file << writer.m_hook_angel << std::endl;
-        file << writer.countdown << std::endl;
-        file << writer.m_bomb_num << std::endl;
-        for (ArchivedGameObject& obj : writer.m_gameObjects) {
-            file << obj.type << std::endl;
-            file << obj.x << std::endl;
-            file << obj.y << std::endl;
-            file << obj.radiusType << std::endl;
-        }
-    }
-}
 
 class CGame : public CScene {
 protected:
@@ -1585,7 +1611,7 @@ public:
         m_bomb.init(img_bomb, mask_bomb);
         m_miner.init(img_goldminer_1, mask_goldminer_1, img_goldminer_2, mask_goldminer_2);
         init_m_Boombs();
-        if (information == NULL) {
+        if (information == nullptr) {
             m_gameObjects.clear();
             m_stage.init(stage);
             m_clock.init(GAME_TIME);
@@ -1594,13 +1620,16 @@ public:
         } else {
             m_gameObjects.clear();
             m_stage.init(stage);
-            m_clock.init(information.m_clock_remainingTime);
-            m_score.init(information.m_score_score, 1000 + ((stage - 1) % 5 + 1) * 500);
-            m_hook.setAngel(information.m_hook_angel);
-            m_hook.setAngelSpeed(information.m_hook_angelSpeed);
-            countdown = information.countdown;
+            m_clock.init(information->m_clock_remainingTime);
+            m_score.init(information->m_score_score, 1000 + ((stage - 1) % 5 + 1) * 500);
+            m_hook.setAngle(information->m_hook_angel);
+            m_hook.setAngleSpeed(information->m_hook_angelSpeed);
+            countdown = information->countdown;
             init_m_GameObjects();
+            information = nullptr;
         }
+        update();
+        render();
     }
 
     void update() override {
@@ -1689,11 +1718,14 @@ private:
             } else if (ch == L'q' || ch == L'Q') {
                 setGameScene(GameSceneType::MENU);
             } else if (ch == L'p' || ch == L'P') {
+                m_clock.setStopType();
                 while (true) {
-                    MOUSEMSG m = GetMouseMsg();
-                    m_button_quit.simulateMouseMSG(m);
-                    if (m.uMsg == WM_LBUTTONDOWN) {
-                        break;
+                    if (MouseHit()) {
+                        MOUSEMSG m = GetMouseMsg();
+                        m_button_quit.simulateMouseMSG(m);
+                        if (m.uMsg == WM_LBUTTONDOWN) {
+                            break;
+                        }
                     }
                     if (kbhit()) {
                         wchar_t ch = _getwch();
@@ -1701,16 +1733,24 @@ private:
                             setGameScene(GameSceneType::MENU);
                             return;
                         } else if (ch == L'p' || ch == L'P') {
+                            m_clock.setContinueType();
                             break;
-                        } else if (ch == L'a' || ch == L'A') {
+                        } else if (ch == L's' || ch == L'S') {
                             archiveInformation();
-                            saveArchivedInformation(information);
+                            saveArchivedInformation(*information);
+                            information = nullptr;
+                            setGameScene(GameSceneType::NULLSCENE);
+                            return;
                         }
                     }
+                    Sleep(SLEEP_TIME);
                 }
-            } else if (ch == L'a' || ch == L'A') {
+            } else if (ch == L's' || ch == L'S') {
                 archiveInformation();
-                saveArchivedInformation(information);
+                saveArchivedInformation(*information);
+                information = nullptr;
+                setGameScene(GameSceneType::NULLSCENE);
+                return;
             }
         }
     }
@@ -1793,7 +1833,7 @@ private:
      */
     void init_m_GameObjects() {
         m_gameObjects.clear();
-        if (information == NULL) {
+        if (information == nullptr) {
             int num_index = tanh((stage - 1) % 5 + 1);
             int num_gold = 3 + 8 * num_index + rand() % 3;
             int num_rock = 3 + 3 * num_index + rand() % 2;
@@ -1824,7 +1864,7 @@ private:
             IMAGE img;
             IMAGE mask;
             GameObject obj;
-            for (ArchivedGameObject& reader_gameObject : information.m_gameObjects) {
+            for (ArchivedGameObject& reader_gameObject : information->m_gameObjects) {
                 if (reader_gameObject.type == GameObjectType::GOLD) {
                     if (reader_gameObject.radiusType == GoldRadiusType::BIG) {
                         img = img_gold_big;
@@ -1883,7 +1923,7 @@ private:
      */
     void init_m_Boombs() {
         m_bombs.clear();
-        int num_bomb = information == NULL ? 5 : information.m_bomb_num;
+        int num_bomb = information == nullptr ? 5 : information->m_bomb_num;
         for (int i = 0; i < num_bomb; ++i) {
             m_bomb.setXY(0.56 * WID + BOMB_W * i, MINER_Y + MINER_H - BOMB_H);
             m_bombs.push_back(m_bomb);
@@ -1943,20 +1983,20 @@ private:
     }
 
     void archiveInformation() {
-        information.m_clock_remainingTime = m_clock.remainTime();
-        information.m_score_score = m_score.getScore();
-        information.m_hook_angelSpeed = m_hook.getAngelSpeed();
-        information.m_hook_angel = m_hook.getAngel();
-        information.countdown = countdown;
-        information.m_bomb_num = m_bombs.size();
-        information.m_gameObjects.clear();
+        information->m_clock_remainingTime = m_clock.remainTime();
+        information->m_score_score = m_score.getScore();
+        information->m_hook_angelSpeed = m_hook.getAngleSpeed();
+        information->m_hook_angel = m_hook.getAngle();
+        information->countdown = countdown;
+        information->m_bomb_num = m_bombs.size();
+        information->m_gameObjects.clear();
         for (GameObject& obj : m_gameObjects) {
             ArchivedGameObject writer_gameObject;
             writer_gameObject.type = obj.getType();
             writer_gameObject.x = obj.getRx();
             writer_gameObject.y = obj.getRy();
-            writer_gameObject.radiusType = obj.getRadiusType();
-            information.m_gameObjects.push_back(writer_gameObject);
+            writer_gameObject.radiusType = obj.getRadius();
+            information->m_gameObjects.push_back(writer_gameObject);
         }
     }
 
@@ -1978,7 +2018,17 @@ public:
 
     void init() {
         CGame::init();
-        // outputStatus("This is just the beginning, so only higher and higher goals");
+        if (stage == 1) {
+            outputStatus("This is just beginning");
+        } else if (stage == 2) {
+            outputStatus("A bit harder");
+        } else if (stage == 3) {
+            outputStatus("Higher goal");
+        } else if (stage == 4) {
+            outputStatus("Come on!");
+        } else if (stage == 5) {
+            outputStatus("The final normal level");
+        }
         playBackgroundMusic(musicPath_background_normal);
     }
 
@@ -2022,28 +2072,28 @@ public:
             case 6: // Stormy start
                 stormyTime = 2;
                 stormyInterval = 6;
-                // outputStatus("Stormy start, so the game is a little bit harder");
+                outputStatus("Stormy start");
                 break;
             case 7: // More game objects
                 stormyTime = 2;
                 stormyInterval = 6;
-                // outputStatus("More game objects");
+                outputStatus("A bit harder");
                 break;
             case 8: // The days are shorter
                 stormyTime = 1;
                 stormyInterval = 6;
-                // outputStatus("The days are shorter");
+                outputStatus("The days are shorter");
                 break;
             case 9: // The nights are longer
                 stormyTime = 1;
                 stormyInterval = 7;
-                // outputStatus("The nights are longer");
+                outputStatus("The nights are longer");
                 break;
             case 10: // Faster storms with less time to watch
                 startTime = 1;
                 stormyTime = 1;
                 stormyInterval = 7;
-                // outputStatus("Faster storms with less time to watch");
+                outputStatus("Faster storms with less time to watch");
                 break;
             default:
                 break;
@@ -2116,19 +2166,19 @@ public:
         std::string outputText = "sorry, there're something wrong";
         switch (stage) {
             case 11:
-                outputText = "Quicksand start, so the game is a little bit harder";
+                outputText = "Quicksand start";
                 break;
             case 12:
                 outputText = "Faster settling rate";
                 break;
             case 13:
-                outputText = "The quicksand becomes soft, so heavier objects will settle first";
+                outputText = "Heavier objects will settle first";
                 break;
             case 14:
                 outputText = "The quicksand becomes soft";
                 break;
             case 15:
-                outputText = "Golds will fall quickly, while lighter stones fall very slowly";
+                outputText = "Golds will fall quicklier";
                 break;
             default:
                 break;
@@ -2203,19 +2253,19 @@ public:
         std::string outputText = "sorry, there're something wrong";
         switch (stage) {
             case 16:
-                outputText = "Magnetic start, so the game is a little bit harder";
+                outputText = "Magnetic start";
                 break;
             case 17:
-                outputText = "More game objects and stronger magnetic force";
+                outputText = "A bit harder";
                 break;
             case 18:
                 outputText = "Stronger magnetic force";
                 break;
             case 19:
-                outputText = "The magnetic force starts to change over time, so collect the side target as soon";
+                outputText = "The magnetic force starts to change over time";
                 break;
             case 20:
-                outputText = "Stronger magnetic force";
+                outputText = "FINAL!!! Stronger magnetic force";
                 break;
             default:
                 break;
@@ -2303,7 +2353,7 @@ public:
      * @brief Init the win scene.
      * This function will play the background music for the win scene.
      */
-    void init() override {
+    void init() {
         playBackgroundMusic(musicPath_background_win);
     }
 
@@ -2372,7 +2422,7 @@ public:
      * @brief Init the lose scene.
      * This function will play the background music for the lose scene.
      */
-    void init() override {
+    void init() {
         playBackgroundMusic(musicPath_background_lose);
     }
 
@@ -2429,7 +2479,7 @@ public:
      * @brief Init the over scene.
      * This function will play the background music for the over scene.
      */
-    void init() override {
+    void init() {
         playBackgroundMusic(musicPath_background_over);
     }
 
@@ -2644,6 +2694,8 @@ private:
         loadimage(&img_game_win, imgPath_game_win.c_str(), WID, HEI, true);
         loadimage(&img_game_lose, imgPath_game_lose.c_str(), WID, HEI, true);
         loadimage(&img_game_over, imgPath_game_over.c_str(), WID, 1684 * WID / 1180, true);
+        loadimage(&img_stoneStab, imgPath_stoneStab.c_str(), WID * 0.6, HEI * 0.6, true);
+        loadimage(&mask_stoneStab, maskPath_stoneStab.c_str(), WID * 0.6, HEI * 0.6, true);
         for (int i = 0; i < 9; ++i) {
             IMAGE img;
             IMAGE mask;

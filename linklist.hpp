@@ -51,12 +51,6 @@ private:
 public:
     LinkedList() : head(nullptr), tail(nullptr), size_(0) {}
 
-    LinkedList(const LinkedList& other) : head(nullptr), tail(nullptr), size_(0) {
-        for (auto it = other.begin(); it != other.end(); ++it) {
-            push_back(*it);
-        }
-    }
-
     LinkedList& operator=(const LinkedList& other) {
         if (this != &other) {
             clear();
