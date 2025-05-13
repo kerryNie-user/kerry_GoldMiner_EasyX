@@ -15,9 +15,15 @@
 #include <memory>
 #include <iomanip>
 
+#include "respath.hpp"
 #include "linklist.hpp"  // My linked list with almost all of the functions vector has
 
 #pragma comment(lib, "Winmm.lib")  // For PlaySound
+
+GameSceneType currentScene = GameSceneType::MENU;
+std::string username = "kerry";  // Focused user's username
+std::string password = "kerry";  // Focused user's password
+int stage = 5;                   // Focused user's stage
 
 /**
  * @brief Get the current time in milliseconds since epoch.
@@ -38,68 +44,22 @@ inline double degreesToRadians(double angleDegrees) {
     return angleDegrees * M_PI / 180.0;
 }
 
+/**
+ * @brief Put the image with the mask on the screen.
+ * @param img The image to be put.
+ * @param mask The mask of the image.
+ * @param x The x coordinate of the image.
+ * @param y The y coordinate of the image.
+ */
+void putimgwithmask(IMAGE& img, IMAGE& mask, int x, int y) {
+    putimage(x, y, &mask, NOTSRCERASE);
+    putimage(x, y, &img, SRCINVERT);
+}
+
+
 LinkedList<std::string> storedUsername;  // All the usernames in the file
 LinkedList<std::string> storedPassword;  // All the passwords in the file
 LinkedList<int> storedStage;             // All the stages in the file
-
-std::string username = "kerry";  // Focused user's username
-std::string password = "kerry";  // Focused user's password
-int stage = 5;                   // Focused user's stage
-
-std::string filePath = "users.txt";
-std::string imgPath_startup = "res/img_startup.jpg";
-std::string imgPath_signin = "res/img_signin.jpg";
-std::string imgPath_login = "res/img_login.jpg";
-std::string imgPath_game_background = "res/img_game_background.jpg";
-std::string imgPath_goldminer_1 = "res/img_goldminer_1.jpg";
-std::string maskPath_goldminer_1 = "res/img_goldminer_mask_1.jpg";
-std::string imgPath_goldminer_2 = "res/img_goldminer_2.jpg";
-std::string maskPath_goldminer_2 = "res/img_goldminer_mask_2.jpg";
-std::string imgPath_brick = "res/img_brick.jpg";
-std::string imgPath_gold_big = "res/img_gold_big.jpg";
-std::string maskPath_gold_big = "res/img_gold_big_mask.jpg";
-std::string imgPath_gold_mid = "res/img_gold_mid.jpg";
-std::string maskPath_gold_mid = "res/img_gold_mid_mask.jpg";
-std::string imgPath_gold_small = "res/img_gold_small.jpg";
-std::string maskPath_gold_small = "res/img_gold_small_mask.jpg";
-std::string imgPath_rock_mid = "res/img_rock_mid.jpg";
-std::string maskPath_rock_mid = "res/img_rock_mid_mask.jpg";
-std::string imgPath_rock_small = "res/img_rock_small.jpg";
-std::string maskPath_rock_small = "res/img_rock_small_mask.jpg";
-std::string imgPath_diamond = "res/img_diamond.jpg";
-std::string maskPath_diamond = "res/img_diamond_mask.jpg";
-std::string imgPath_hook = "res/img_hook.bmp";
-std::string maskPath_hook = "res/img_hook_mask.bmp";
-std::string imgPath_bomb = "res/img_bomb.jpg";
-std::string maskPath_bomb = "res/img_bomb_mask.jpg";
-std::string imgPath_game_win = "res/img_game_win.jpg";
-std::string imgPath_game_lose = "res/img_game_lose.jpg";
-std::string imgPath_game_over = "res/img_game_over.jpeg";
-std::string imgPath_stoneStab = "res/img_stoneStab.jpg";
-std::string maskPath_stoneStab = "res/img_stoneStab_mask.jpg";
-
-// Explosion effect frame animation
-LinkedList<std::string> imgPath_explosive;
-LinkedList<std::string> maskPath_explosive;
-
-// Background music paths
-std::string musicPath_background_normal = "res/music_background_normal.mp3";
-std::string musicPath_background_stormy = "res/music_background_stormy.mp3";
-std::string musicPath_background_quicksand = "res/music_background_quicksand.mp3";
-std::string musicPath_background_magnetic = "res/music_background_magnetic.mp3";
-std::string musicPath_background_win = "res/music_background_win.mp3";
-std::string musicPath_background_lose = "res/music_background_lose.mp3";
-std::string musicPath_background_over = "res/music_background_normal.mp3";
-
-// Background sound effects
-std::string musicPath_bomb_explosive = "res/music_bomb_explosive.mp3";
-std::string musicPath_hook_goingOut = "res/music_hook_goingOut.mp3";
-std::string musicPath_hook_treasure = "res/music_hook_treasure.mp3";
-std::string musicPath_hook_gold = "res/music_hook_gold.mp3";
-std::string musicPath_hook_rock = "res/music_hook_rock.mp3";
-std::string musicPath_transition = "res/music_transition.mp3";
-std::string musicPath_thunder = "res/music_thunder.mp3";
-std::string musicPath_countdown = "res/music_countdown.mp3";
 
 IMAGE img_startup;
 IMAGE img_signin;
@@ -130,6 +90,7 @@ IMAGE img_game_lose;
 IMAGE img_game_over;
 IMAGE img_stoneStab;
 IMAGE mask_stoneStab;
+IMAGE img_null;  // A null image for the null object
 
 // Explosion effect frame animation picture
 LinkedList<IMAGE> img_explosive;
@@ -211,6 +172,8 @@ typedef struct {
     LinkedList<ArchivedGameObject> m_gameObjects;
 } ArchivedInformation;
 
+ArchivedInformation* information = nullptr;
+
 /**
  * @brief The game scene.
  * This scene is the main scene of the game.
@@ -270,8 +233,6 @@ void saveArchivedInformation(ArchivedInformation& writer) {
         }
     }
 }
-
-ArchivedInformation* information = nullptr;
 
 class Clock {
 private:
@@ -455,6 +416,8 @@ public:
 
 using ButtonCallBack = std::function<void()>;
 
+
+// file: control.hpp
 class CControl {
 protected:
     int x, y, w, h;
@@ -573,18 +536,8 @@ public:
     }
 };
 
-/**
- * @brief Put the image with the mask on the screen.
- * @param img The image to be put.
- * @param mask The mask of the image.
- * @param x The x coordinate of the image.
- * @param y The y coordinate of the image.
- */
-void putimgwithmask(IMAGE& img, IMAGE& mask, int x, int y) {
-    putimage(x, y, &mask, NOTSRCERASE);
-    putimage(x, y, &img, SRCINVERT);
-}
 
+// file: object.hpp
 class CObject {
 protected:
     virtual void draw() = 0;
@@ -1138,6 +1091,8 @@ public:
     }
 };
 
+
+// file: Weather.hpp
 typedef struct {
     int x, y;
     int length;
@@ -1279,6 +1234,8 @@ public:
     }
 };
 
+
+// file: scene.hpp
 class CScene {
 protected:
     int m_scene;
@@ -1338,10 +1295,6 @@ protected:
     }
 };
 
-/**
- * @brief The menu scene.
- * This scene is the first scene of the game.
- */
 class CMenu : public CScene {
 private:
     CButton m_button_signin;
@@ -1392,10 +1345,6 @@ private:
     }
 };
 
-/**
- * @brief The login scene.
- * This scene is used to sign up a new account and login this account.
- */
 class CSignin : public CScene {
 private:
     bool confirm;    
@@ -1469,7 +1418,7 @@ private:
             outputStatus("Confirm password cannot be empty");
             return;
         } else if (password != m_input_confirm.getInputText()) {
-            outputStatus("The passwords are different twice");
+            outputStatus("The passwordsb are different twice");
             return;
         } else {
             for (std::string user : storedUsername) {
@@ -1496,10 +1445,6 @@ private:
     }
 };
 
-/**
- * @brief The login scene.
- * This scene is used to login the account.
- */
 class CLogin : public CScene {
 private:
     CInputBox m_input_username;
@@ -1580,10 +1525,7 @@ private:
     }
 };
 
-IMAGE img_null;  // A null image for the null object
 GameObject nullObject(GameObjectType::GOLD, 0, 0, GoldRadiusType::BIG, img_null, img_null);  // A null object for the 'null' pointer
-LinkedList<CBomb> m_bombs;             // A linked list to store every bombs
-LinkedList<GameObject> m_gameObjects;  // A linked list to store every game objects
 
 class CGame : public CScene {
 protected:
@@ -1592,13 +1534,14 @@ protected:
     Stage m_stage;
     CMiner m_miner;
     CHook m_hook;
-    CBomb m_bomb;
     CButton m_button_quit;
     GameObject* m_focusedGameObject = &nullObject;
     GameObject* m_explosedGameObject = &nullObject;
+    LinkedList<CBomb> m_bombs;             // A linked list to store every bombs
+    LinkedList<GameObject> m_gameObjects;  // A linked list to store every game objects
     bool countdown = false;  // Whether the countdown effective sound is need to be played
 
-    CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), m_clock(), m_score(), m_stage(), m_miner(), m_hook(), m_bomb(),
+    CGame(const std::function<void(GameSceneType)>& setGameScene) : CScene(setGameScene), m_clock(), m_score(), m_stage(), m_miner(), m_hook(),
         m_button_quit(0.638 * WID, 0.01375 * HEI, 0.14 * WID, 0.07 * HEI, "Quit", std::bind(&CGame::callbackQuit, this)) {}
     
 public:
@@ -1608,7 +1551,6 @@ public:
      */
     virtual void init() {
         m_hook.init(img_hook, mask_hook);
-        m_bomb.init(img_bomb, mask_bomb);
         m_miner.init(img_goldminer_1, mask_goldminer_1, img_goldminer_2, mask_goldminer_2);
         init_m_Boombs();
         if (information == nullptr) {
@@ -1626,6 +1568,9 @@ public:
             m_hook.setAngleSpeed(information->m_hook_angelSpeed);
             countdown = information->countdown;
             init_m_GameObjects();
+            if (information != nullptr) {
+                delete information;
+            }
             information = nullptr;
         }
         update();
@@ -1738,6 +1683,9 @@ private:
                         } else if (ch == L's' || ch == L'S') {
                             archiveInformation();
                             saveArchivedInformation(*information);
+                            if (information != nullptr) {
+                                delete information;
+                            }
                             information = nullptr;
                             setGameScene(GameSceneType::NULLSCENE);
                             return;
@@ -1748,6 +1696,9 @@ private:
             } else if (ch == L's' || ch == L'S') {
                 archiveInformation();
                 saveArchivedInformation(*information);
+                if (information != nullptr) {
+                    delete information;
+                }
                 information = nullptr;
                 setGameScene(GameSceneType::NULLSCENE);
                 return;
@@ -1922,11 +1873,12 @@ private:
      * @brief Init 5 bombs list, with compact arrangement.
      */
     void init_m_Boombs() {
+        CBomb bomb.init(img_bomb, mask_bomb);
         m_bombs.clear();
         int num_bomb = information == nullptr ? 5 : information->m_bomb_num;
         for (int i = 0; i < num_bomb; ++i) {
             m_bomb.setXY(0.56 * WID + BOMB_W * i, MINER_Y + MINER_H - BOMB_H);
-            m_bombs.push_back(m_bomb);
+            m_bombs.push_back(bomb);
         }
     }
 
@@ -1983,6 +1935,7 @@ private:
     }
 
     void archiveInformation() {
+        information = new ArchivedInformation;
         information->m_clock_remainingTime = m_clock.remainTime();
         information->m_score_score = m_score.getScore();
         information->m_hook_angelSpeed = m_hook.getAngleSpeed();
@@ -2313,10 +2266,6 @@ public:
     }
 };
 
-/**
- * @brief The game factory class.
- * This class will create the game scene according to the stage.
- */
 class CGameFactory {
     public:
         static CGame* createGame(GameStageType type, const std::function<void(GameSceneType)>& setGameScene) {
@@ -2335,10 +2284,6 @@ class CGameFactory {
         }
     };
 
-/**
- * @brief The win scene class.
- * This class will render scene if you win.
- */
 class CWin : public CScene {
 private:
     CButton m_button_continue;
@@ -2405,10 +2350,6 @@ private:
     }
 };
 
-/**
- * @brief The lose scene class.
- * This class will render scene if you lose.
- */
 class CLose : public CScene {
 private:
     CButton m_button_retry;
@@ -2509,10 +2450,8 @@ public:
     }    
 };
 
-/**
- * @brief The game class.
- * This class will manage all the game scene.
- */
+
+// file: game.cpp
 class Game {
 private:
     GameSceneType m_game_scene;  // The current game scene
@@ -2526,7 +2465,7 @@ private:
     bool m_isOverInit = false;   // Whether the over scene is initialized
 
 public:
-    Game(): m_game_scene(GameSceneType::GAME),
+    Game(): m_game_scene(currentScene),
             m_menu([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_signin([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_login([this](GameSceneType scene) { this->m_game_scene = scene; }),
