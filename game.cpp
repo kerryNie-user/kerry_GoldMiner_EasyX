@@ -20,7 +20,6 @@
 
 #pragma comment(lib, "Winmm.lib")  // For PlaySound
 
-GameSceneType currentScene = GameSceneType::MENU;
 std::string username = "kerry";  // Focused user's username
 std::string password = "kerry";  // Focused user's password
 int stage = 5;                   // Focused user's stage
@@ -178,12 +177,13 @@ ArchivedInformation* information = nullptr;
  * @brief The game scene.
  * This scene is the main scene of the game.
  */
-void loadArchivedInformation(ArchivedInformation& reader) {
+bool loadArchivedInformation(ArchivedInformation& reader) {
     std::string filePath = "users_archive/" + username + ".txt";
     std::ifstream file(filePath);
     if (file.is_open()) {
         if (file.peek() == std::ifstream::traits_type::eof()) {
             file.close();
+            return false;
         }
         file >> reader.m_clock_remainingTime;
         file >> reader.m_score_score;
@@ -204,7 +204,10 @@ void loadArchivedInformation(ArchivedInformation& reader) {
             reader.m_gameObjects.push_back(reader_gameObject);
         }
         file.close();
-        remove(filePath.c_str()); 
+        remove(filePath.c_str());
+        return true;
+    } else {
+        return false;
     }
 }
 
@@ -1508,7 +1511,11 @@ private:
                 if (stage > 20) {
                     stage = 1;
                 }
-                loadArchivedInformation(*information);
+                information = new ArchivedInformation;
+                if (!loadArchivedInformation(*information)) {
+                    delete information;
+                    information = nullptr;
+                }
                 setGameScene(GameSceneType::GAME);
                 return;
             }
@@ -1568,9 +1575,7 @@ public:
             m_hook.setAngleSpeed(information->m_hook_angelSpeed);
             countdown = information->countdown;
             init_m_GameObjects();
-            if (information != nullptr) {
-                delete information;
-            }
+            delete information;
             information = nullptr;
         }
         update();
@@ -1681,11 +1686,14 @@ private:
                             m_clock.setContinueType();
                             break;
                         } else if (ch == L's' || ch == L'S') {
+                            information = new ArchivedInformation;
+                            if (information == nullptr) {
+                                std::cerr << "Failed to allocate memory for ArchivedInformation" << std::endl;
+                                return;
+                            }
                             archiveInformation();
                             saveArchivedInformation(*information);
-                            if (information != nullptr) {
-                                delete information;
-                            }
+                            delete information;
                             information = nullptr;
                             setGameScene(GameSceneType::NULLSCENE);
                             return;
@@ -1694,11 +1702,14 @@ private:
                     Sleep(SLEEP_TIME);
                 }
             } else if (ch == L's' || ch == L'S') {
+                information = new ArchivedInformation;
+                if (information == nullptr) {
+                    std::cerr << "Failed to allocate memory for ArchivedInformation" << std::endl;
+                    return;
+                }
                 archiveInformation();
                 saveArchivedInformation(*information);
-                if (information != nullptr) {
-                    delete information;
-                }
+                delete information;
                 information = nullptr;
                 setGameScene(GameSceneType::NULLSCENE);
                 return;
@@ -1842,6 +1853,8 @@ private:
                 obj = GameObjectFactory::createGameObject(reader_gameObject.type, reader_gameObject.x, reader_gameObject.y, reader_gameObject.radiusType, img, mask);
                 m_gameObjects.push_back(obj);
             }
+            delete information;
+            information = nullptr;
         }
     }
 
@@ -1873,11 +1886,12 @@ private:
      * @brief Init 5 bombs list, with compact arrangement.
      */
     void init_m_Boombs() {
-        CBomb bomb.init(img_bomb, mask_bomb);
         m_bombs.clear();
+        CBomb bomb;
+        bomb.init(img_bomb, mask_bomb);
         int num_bomb = information == nullptr ? 5 : information->m_bomb_num;
         for (int i = 0; i < num_bomb; ++i) {
-            m_bomb.setXY(0.56 * WID + BOMB_W * i, MINER_Y + MINER_H - BOMB_H);
+            bomb.setXY(0.56 * WID + BOMB_W * i, MINER_Y + MINER_H - BOMB_H);
             m_bombs.push_back(bomb);
         }
     }
@@ -1935,7 +1949,6 @@ private:
     }
 
     void archiveInformation() {
-        information = new ArchivedInformation;
         information->m_clock_remainingTime = m_clock.remainTime();
         information->m_score_score = m_score.getScore();
         information->m_hook_angelSpeed = m_hook.getAngleSpeed();
@@ -2465,7 +2478,7 @@ private:
     bool m_isOverInit = false;   // Whether the over scene is initialized
 
 public:
-    Game(): m_game_scene(currentScene),
+    Game(): m_game_scene(GameSceneType::MENU),
             m_menu([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_signin([this](GameSceneType scene) { this->m_game_scene = scene; }),
             m_login([this](GameSceneType scene) { this->m_game_scene = scene; }),
