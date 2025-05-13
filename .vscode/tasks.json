@@ -6,7 +6,8 @@
             "command": "C:\\TDM-GCC\\bin\\g++.exe",
             "args": [
                 "-fdiagnostics-color=always",
-                "-g",
+                //"-g",
+                "-O3",//release
                 "${file}",
                 "-o",
                 "${fileDirname}\\${fileBasenameNoExtension}.exe",
