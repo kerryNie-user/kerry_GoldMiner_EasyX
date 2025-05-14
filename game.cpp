@@ -1695,7 +1695,7 @@ private:
                             saveArchivedInformation(*information);
                             delete information;
                             information = nullptr;
-                            outputStatus("Saved successfully")
+                            outputStatus("Saved successfully");
                             Sleep(1000);
                         }
                     }
@@ -1712,7 +1712,7 @@ private:
                 saveArchivedInformation(*information);
                 delete information;
                 information = nullptr;
-                outputStatus("Saved successfully")
+                outputStatus("Saved successfully");
                 Sleep(1000);
                 m_clock.setContinueType();
             }
