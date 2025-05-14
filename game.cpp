@@ -1695,13 +1695,14 @@ private:
                             saveArchivedInformation(*information);
                             delete information;
                             information = nullptr;
-                            setGameScene(GameSceneType::NULLSCENE);
-                            return;
+                            outputStatus("Saved successfully")
+                            Sleep(1000);
                         }
                     }
                     Sleep(SLEEP_TIME);
                 }
             } else if (ch == L's' || ch == L'S') {
+                m_clock.setStopType();
                 information = new ArchivedInformation;
                 if (information == nullptr) {
                     std::cerr << "Failed to allocate memory for ArchivedInformation" << std::endl;
@@ -1711,8 +1712,9 @@ private:
                 saveArchivedInformation(*information);
                 delete information;
                 information = nullptr;
-                setGameScene(GameSceneType::NULLSCENE);
-                return;
+                outputStatus("Saved successfully")
+                Sleep(1000);
+                m_clock.setContinueType();
             }
         }
     }
